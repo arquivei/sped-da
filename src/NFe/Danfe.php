@@ -594,8 +594,8 @@ class Danfe extends Common
             if ($this->textoAdic != '') {
                 $this->textoAdic .= ". \r\n";
             }
-            $this->textoAdic .= "LOCAL DE ENTREGA : " . $txRetCNPJ . '-' . $txRetxLgr . ', ' . $txRetnro . ' ' . $txRetxCpl .
-                ' - ' . $txRetxBairro . ' ' . $txRetxMun . ' - ' . $txRetUF . "\r\n";
+            $this->textoAdic .= "LOCAL DE ENTREGA : " . $txRetCNPJ . '-' . $txRetxLgr . ', ' . $txRetnro . ' '
+                . $txRetxCpl . ' - ' . $txRetxBairro . ' ' . $txRetxMun . ' - ' . $txRetUF . "\r\n";
         }
         //informações adicionais
         $this->textoAdic .= $this->geraInformacoesDasNotasReferenciadas();
@@ -2421,7 +2421,9 @@ class Danfe extends Common
         $nFCI = (!empty($itemProd->getElementsByTagName('nFCI')->item(0)->nodeValue)) ?
             ' FCI:' . $itemProd->getElementsByTagName('nFCI')->item(0)->nodeValue : '';
         $tmp_ad = $infAdProd . ($this->descProdInfoComplemento ? $loteTxt . $impostos . $nFCI : '');
-        $texto = $prod->getElementsByTagName("xProd")->item(0)->nodeValue . (strlen($tmp_ad) != 0 ? "\n    " . $tmp_ad : '');
+        $texto = $prod->getElementsByTagName("xProd")->item(0)->nodeValue .
+            (strlen($tmp_ad) != 0 ? "\n    " . $tmp_ad : '');
+
         if ($this->descProdQuebraLinha) {
             $texto = str_replace(";", "\n", $texto);
         }
