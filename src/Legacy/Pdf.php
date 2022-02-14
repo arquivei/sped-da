@@ -209,7 +209,11 @@ class Pdf extends Fpdf
                 $jeu = (($madeA < $madeB) ? "B" : "A" );
                 $jeuguid = $jeu . "guid";
                 $crypt .= chr(($crypt > "") ? $this->jSwap["$jeu"] : $this->jStart["$jeu"]);
-                $crypt .= strtr(substr($code, 0, $made), $this->setFrom[$jeu], $this->setTo[$jeu]);
+                $crypt .= strtr(
+                    substr($code, 0, $made),
+                    isset($this->setFrom[$jeu]) ? $this->setFrom[$jeu] : $jeu,
+                    isset($this->setTo[$jeu]) ? $this->setTo[$jeu] : $jeu
+                );
             }
             $code = substr($code, $made);
             $Aguid = substr($Aguid, $made);
@@ -331,7 +335,7 @@ class Pdf extends Fpdf
         }
         $this->out($op);
     }
-    
+
     /**
      * Desenha o arco para arredondar o canto do retangulo
      * @param   number $x1
@@ -356,7 +360,7 @@ class Pdf extends Fpdf
             )
         );
     }
-    
+
     /**
      * Desenha um retangulo com linhas tracejadas
      * @param   number $x1
@@ -425,7 +429,7 @@ class Pdf extends Fpdf
             $this->rect($xi, $yi, $w, $h);
         }
     }
-    
+
     /**
      * Insere linhas de texto na caixa
      * @param   number  $w
@@ -561,7 +565,7 @@ class Pdf extends Fpdf
         $this->x = $this->lMargin;
         return $nl;
     }
-    
+
     /**
      * Quebra o texto para caber na caixa
      * @param   type $text
@@ -611,7 +615,7 @@ class Pdf extends Fpdf
         $text = rtrim($text);
         return $count;
     }
-    
+
     /**
      * Celula com escala horizontal caso o texto seja muito largo
      * @param   number  $w
@@ -721,7 +725,7 @@ class Pdf extends Fpdf
     {
         $this->cellFit($w, $h, $txt, $border, $ln, $align, $fill, $link, false, false);
     }
-    
+
     /**
      * Celula com espaçamento de caracteres forçado
      * @param   number  $w
@@ -745,7 +749,7 @@ class Pdf extends Fpdf
     ) {
         $this->cellFit($w, $h, $txt, $border, $ln, $align, $fill, $link, false, true);
     }
-    
+
     /**
      * Patch para trabalhar com textos de duplo byte CJK
      * @param   string $s
@@ -817,7 +821,7 @@ class Pdf extends Fpdf
             $n--;
         }
     }
-    
+
     /**
      * pGetNumLines
      * Obtem o numero de linhas usadas pelo texto usando a fonte especifidada
@@ -833,7 +837,7 @@ class Pdf extends Fpdf
         $n = $this->wordWrap($text, $width - 0.2);
         return $n;
     }
-    
+
     /**
      * pTextBox
      * Cria uma caixa de texto com ou sem bordas. Esta função perimite o alinhamento horizontal
@@ -969,7 +973,7 @@ class Pdf extends Fpdf
         }
         return ($y1 - $y) - $incY;
     }
-    
+
     /**
      * Cria uma caixa de texto com ou sem bordas. Esta função permite o alinhamento horizontal
      * ou vertical do texto dentro da caixa, rotacionando-o em 90 graus, essa função precisa que
