@@ -1317,19 +1317,28 @@ class DacteOS extends Common
         $x += $w * 0.26;
 
         $texto = !empty($this->ICMS->getElementsByTagName("vBC")->item(0)->nodeValue) ?
-            number_format($this->getTagValue($this->ICMS, "vBC"), 2, ",", ".") : '';
+            number_format($this->getTagValue($this->ICMS, "vBC"), 2, ",", ".") : (
+            !empty($this->ICMS->getElementsByTagName("vBCOutraUF")->item(0)->nodeValue) ?
+                number_format($this->getTagValue($this->ICMS, "vBCOutraUF"), 2, ",", ".") : ''
+            );
         $aFont = $this->formatNegrito;
         $this->pdf->textBox($x, $y, $w * $wCol02, $h, $texto, $aFont, 'T', 'L', 0, '');
         $x += $w * $wCol02;
 
         $texto = !empty($this->ICMS->getElementsByTagName("pICMS")->item(0)->nodeValue) ?
-            number_format($this->getTagValue($this->ICMS, "pICMS"), 2, ",", ".") : '';
+            number_format($this->getTagValue($this->ICMS, "pICMS"), 2, ",", ".") : (
+            !empty($this->ICMS->getElementsByTagName("pICMSOutraUF")->item(0)->nodeValue) ?
+                number_format($this->getTagValue($this->ICMS, "pICMSOutraUF"), 2, ",", ".") : ''
+            );
         $aFont = $this->formatNegrito;
         $this->pdf->textBox($x, $y, $w * $wCol02, $h, $texto, $aFont, 'T', 'L', 0, '');
         $x += $w * $wCol02;
 
         $texto = !empty($this->ICMS->getElementsByTagName("vICMS")->item(0)->nodeValue) ?
-            number_format($this->getTagValue($this->ICMS, "vICMS"), 2, ",", ".") : '';
+            number_format($this->getTagValue($this->ICMS, "vICMS"), 2, ",", ".") : (
+            !empty($this->ICMS->getElementsByTagName("vICMSOutraUF")->item(0)->nodeValue) ?
+                number_format($this->getTagValue($this->ICMS, "vICMSOutraUF"), 2, ",", ".") : ''
+            );
         $aFont = $this->formatNegrito;
         $this->pdf->textBox($x, $y, $w * $wCol02, $h, $texto, $aFont, 'T', 'L', 0, '');
         $x += $w * $wCol02;
