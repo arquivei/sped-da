@@ -28,6 +28,7 @@ class Dacte extends Common
     const CODIGOUNIDADEMEDIDA_UNIDADE = '03';
 
     const TIPOMEDIDA_PESOBRUTO = 'PESO BRUTO';
+    const TIPOMEDIDA_TONELADA = 'TONELADA';
     const TIPOMEDIDA_PESOBASECALCULO = 'PESO BASE DE CÁLCULO';
     const TIPOMEDIDA_PESOAFERIDO = 'PESO AFERIDO';
 
@@ -1677,7 +1678,7 @@ class Dacte extends Common
      */
     private function getValidGrossWeight(string $valorPesoBaseCalculo, string $valorPesoAferido): string
     {
-        $valorPesoBruto = $this->getTagValueByTagReference($this->infQ, 'tpMed', self::TIPOMEDIDA_PESOBRUTO, 'qCarga');
+        $valorPesoBruto = $this->calculateWeight();
 
         if (empty($valorPesoBruto) && empty($valorPesoBaseCalculo) && empty($valorPesoAferido)) {
             foreach ($this->infQ as $infQ) {
@@ -1690,6 +1691,31 @@ class Dacte extends Common
         }
 
         return $valorPesoBruto;
+    }
+
+    /**
+     * Calcula o valor em Kg do tipo de medida trabalhado, aplicando o multiplicador correto
+     * Exemplo:
+     * Se a medida é tonelada, o multiplicador é 1000
+     * @return float|int|null
+     */
+    private function calculateWeight()
+    {
+        $measuresAndMultipliers = [
+            self::TIPOMEDIDA_PESOBRUTO => 1,
+            self::TIPOMEDIDA_TONELADA => 1000
+        ];
+
+        foreach (array_keys($measuresAndMultipliers) as $measure) {
+            $weight = $this->getTagValueByTagReference($this->infQ, 'tpMed', $measure, 'qCarga');
+
+            if (!empty($weight)) {
+                $multiplier = $measuresAndMultipliers[$measure];
+                return $weight * $multiplier;
+            }
+        }
+
+        return null;
     }
 
     /**
