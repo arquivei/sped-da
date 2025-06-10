@@ -1712,7 +1712,7 @@ class Dacte extends Common
             }
         }
 
-        return null;
+        return "";
     }
 
     /**
