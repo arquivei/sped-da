@@ -1695,7 +1695,7 @@ class Dacte extends Common
 
     /**
      * Obtem o valor do peso de acordo com o tipo de medida do documento
-     * @return float|int|null
+     * @return float|string
      */
     private function weightByTypeOfMeasure()
     {
@@ -1712,7 +1712,7 @@ class Dacte extends Common
             }
         }
 
-        return null;
+        return "";
     }
 
     /**
