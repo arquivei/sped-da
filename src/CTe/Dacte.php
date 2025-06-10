@@ -28,6 +28,7 @@ class Dacte extends Common
     const CODIGOUNIDADEMEDIDA_UNIDADE = '03';
 
     const TIPOMEDIDA_PESOBRUTO = 'PESO BRUTO';
+    const TIPOMEDIDA_TONELADA = 'TONELADA';
     const TIPOMEDIDA_PESOBASECALCULO = 'PESO BASE DE CÁLCULO';
     const TIPOMEDIDA_PESOAFERIDO = 'PESO AFERIDO';
 
@@ -1677,7 +1678,7 @@ class Dacte extends Common
      */
     private function getValidGrossWeight(string $valorPesoBaseCalculo, string $valorPesoAferido): string
     {
-        $valorPesoBruto = $this->getTagValueByTagReference($this->infQ, 'tpMed', self::TIPOMEDIDA_PESOBRUTO, 'qCarga');
+        $valorPesoBruto = $this->weightByTypeOfMeasure();
 
         if (empty($valorPesoBruto) && empty($valorPesoBaseCalculo) && empty($valorPesoAferido)) {
             foreach ($this->infQ as $infQ) {
@@ -1690,6 +1691,28 @@ class Dacte extends Common
         }
 
         return $valorPesoBruto;
+    }
+
+    /**
+     * Obtem o valor do peso de acordo com o tipo de medida do documento
+     * @return float|int|null
+     */
+    private function weightByTypeOfMeasure()
+    {
+        $measures = [
+            self::TIPOMEDIDA_PESOBRUTO,
+            self::TIPOMEDIDA_TONELADA
+        ];
+
+        foreach ($measures as $measure) {
+            $weight = $this->getTagValueByTagReference($this->infQ, 'tpMed', $measure, 'qCarga');
+
+            if (!empty($weight)) {
+                return $weight;
+            }
+        }
+
+        return null;
     }
 
     /**
