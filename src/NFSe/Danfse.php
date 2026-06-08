@@ -10,31 +10,32 @@ use Com\Tecnick\Barcode\Barcode;
 class Danfse extends DaCommon
 {
     // Coordinate constants (mm, from spec NT-008 section 2.4.5)
-    private const X_L   =   3.0;
-    private const X_C2  =  54.1;
-    private const X_C3  = 105.1;
-    private const X_C4  = 156.2;
-    private const X_QR  = 174.8;
-    private const X_QR2 = 158.0;
+    private const X_L   =   2.0;
+    private const X_C2  =  53.5;
+    private const X_C3  = 105.0;
+    private const X_C4  = 156.5;
+    private const X_QR  = 174.0;
+    private const X_QR2 = 156.5;
 
-    private const W_FULL = 204.0;
-    private const W_C1   =  51.1;
-    private const W_C    =  50.9;
-    private const W_WIDE = 101.9;
+    private const W_FULL = 206.0;
+    private const W_C1   =  51.5;
+    private const W_C    =  51.5;
+    private const W_WIDE = 103.0;
     private const W_QR   =  15.2;
 
     private const H_ROW      = 6.3;
     private const H_ROW7     = 6.7;
     private const H_MIN_SUPR = 3.2;
 
-    private const F_BLOCO_TIT  = ['font' => 'helvetica', 'size' => 7, 'style' => 'B'];
-    private const F_CAMPO_TIT  = ['font' => 'helvetica', 'size' => 6, 'style' => 'B'];
-    private const F_CONTEUDO   = ['font' => 'helvetica', 'size' => 7, 'style' => ''];
-    private const F_HEADER_CTR = ['font' => 'helvetica', 'size' => 9, 'style' => 'B'];
-    private const F_HEADER_RGT = ['font' => 'helvetica', 'size' => 8, 'style' => ''];
-    private const F_QR_COMPL   = ['font' => 'helvetica', 'size' => 6, 'style' => ''];
-    private const F_HOMOLOG    = ['font' => 'helvetica', 'size' => 9, 'style' => 'B'];
-    private const F_WATERMARK  = ['font' => 'helvetica', 'size' => 50, 'style' => ''];
+    private const F_BLOCO_TIT  = ['font' => 'arial', 'size' => 7, 'style' => 'B'];
+    private const F_CAMPO_TIT  = ['font' => 'arial', 'size' => 6, 'style' => 'B'];
+    private const F_CAMPO_ID   = ['font' => 'arial', 'size' => 7, 'style' => 'B'];
+    private const F_CONTEUDO   = ['font' => 'arial', 'size' => 7, 'style' => ''];
+    private const F_HEADER_CTR = ['font' => 'arial', 'size' => 9, 'style' => 'B'];
+    private const F_HEADER_RGT = ['font' => 'arial', 'size' => 8, 'style' => ''];
+    private const F_QR_COMPL   = ['font' => 'arial', 'size' => 6, 'style' => ''];
+    private const F_HOMOLOG    = ['font' => 'arial', 'size' => 9, 'style' => 'B'];
+    private const F_WATERMARK  = ['font' => 'arial', 'size' => 50, 'style' => ''];
 
     private Dom $dom;
     private \DOMElement $infNFSe;
@@ -123,7 +124,7 @@ class Danfse extends DaCommon
             + $this->hServico + $this->hISSQN + $this->hTribFederal
             + $this->hIBSCBS + $this->hValorTotal + $this->hInfoCompl + $this->hCanhoto;
         $this->pdf->SetLineWidth(0.35);
-        $this->pdf->Rect($this->margesq, $this->margsup, self::W_FULL, $totalDocH, 'D');
+        $this->pdf->Rect(self::X_L, $this->margsup, self::W_FULL, $totalDocH, 'D');
         $this->pdf->SetLineWidth(0.18);
 
         $y = (float) $this->margsup;
@@ -209,6 +210,7 @@ class Danfse extends DaCommon
 
         $this->pdf->SetFillColor(242, 242, 242);
         $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'F');
+        $this->pdf->SetFillColor(255, 255, 255);
 
         $xCenter = 44.9;
         $wCenter = 114.2;
@@ -246,20 +248,29 @@ class Danfse extends DaCommon
         $this->pdf->textBox($xRight, $y + 7.6, $wRight, 2.5, $tpAmbLabel,
             self::F_QR_COMPL, 'T', 'R', false, '');
 
-        $this->pdf->Rect(self::X_L, $y, 42.0, $h, 'D');
         $logoPath = dirname(__DIR__, 2) . '/docs/logo-nfs-e-horizontal.png';
         $logoW    = 38.0;
         $logoH    = round($logoW * (389 / 1920), 2);
         $logoX    = self::X_L + (42.0 - $logoW) / 2;
         $logoY    = $y + ($h - $logoH) / 2;
         if (file_exists($logoPath)) {
-            $this->pdf->Image($logoPath, $logoX, $logoY, $logoW, $logoH, 'PNG');
+            $src = imagecreatefrompng($logoPath);
+            $flat = imagecreatetruecolor(imagesx($src), imagesy($src));
+            imagefill($flat, 0, 0, imagecolorallocate($flat, 255, 255, 255));
+            imagecopy($flat, $src, 0, 0, 0, 0, imagesx($src), imagesy($src));
+            imagedestroy($src);
+            ob_start();
+            imagepng($flat);
+            $pngData = ob_get_clean();
+            imagedestroy($flat);
+            $dataUri = 'data://text/plain;base64,' . base64_encode($pngData);
+            $this->pdf->Image($dataUri, $logoX, $logoY, $logoW, $logoH, 'PNG');
         } else {
             $this->pdf->textBox(self::X_L + 1.0, $y + 2.0, 40.0, 8.0,
                 'NFS-e', self::F_HEADER_CTR, 'C', 'C', false, '');
         }
 
-        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'D');
+        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
 
         return $y + $h;
     }
@@ -283,43 +294,44 @@ class Danfse extends DaCommon
         $finNFSe = $this->getFinNFSeLabel($this->getTagValue($this->infDPS, 'finNFSe'));
 
         $qrUrl   = 'https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=' . $chave;
-        $qrX     = self::X_QR;
-        $qrY     = $y + 3.7;
-        $qrSize  = self::W_QR;
+        $qrX    = self::X_QR;
+        $qrY    = $y + 3.7;
+        $qrSize = self::W_QR;
 
-        // Row 0: Chave de acesso (full width, shaded)
+        // Row 0: Chave de acesso (full width)
         $r0h = self::H_ROW7;
-        $this->drawField(self::X_L, $y, self::W_FULL, $r0h, 'CHAVE DE ACESSO DA NFS-E', $chave, true);
+        $this->drawField(self::X_L, $y, self::W_FULL, $r0h, 'CHAVE DE ACESSO DA NFS-E', $chave, false, self::F_CAMPO_ID);
 
-        $r1y     = $y + $r0h;
-        $wQrArea = (self::X_L + self::W_FULL) - $qrX;
+        $r1y = $y + $r0h;
 
-        // Row 1: Número | Competência | Data/Hora
-        $this->drawField(self::X_L,  $r1y, self::W_C1, self::H_ROW7, 'NÚMERO DA NFS-E', $nNFSe, true);
-        $this->drawField(self::X_C2, $r1y, self::W_C,  self::H_ROW7, 'COMPETÊNCIA DA NFS-E', $dCompet, true);
-        $this->drawField(self::X_C3, $r1y, $qrX - self::X_C3, self::H_ROW7, 'DATA E HORA DA EMISSÃO DA NFS-E', $dhProc, true);
+        // Row 1: Número | Competência | Data/Hora (3 colunas iguais + área QR)
+        $this->drawField(self::X_L,  $r1y, self::W_C1, self::H_ROW7, 'NÚMERO DA NFS-E',               $nNFSe,   false, self::F_CAMPO_ID);
+        $this->drawField(self::X_C2, $r1y, self::W_C,  self::H_ROW7, 'COMPETÊNCIA DA NFS-E',           $dCompet, false, self::F_CAMPO_ID);
+        $this->drawField(self::X_C3, $r1y, self::W_C,  self::H_ROW7, 'DATA E HORA DA EMISSÃO DA NFS-E', $dhProc,  false, self::F_CAMPO_ID);
 
         // Row 2: Número DPS | Série | Data/Hora DPS
         $r2y = $r1y + self::H_ROW7;
-        $this->drawField(self::X_L,  $r2y, self::W_C1, self::H_ROW7, 'NÚMERO DO DPS', $nDPS, true);
-        $this->drawField(self::X_C2, $r2y, self::W_C,  self::H_ROW7, 'SÉRIE DA DPS', $serie, true);
-        $this->drawField(self::X_C3, $r2y, $qrX - self::X_C3, self::H_ROW7, 'DATA E HORA DA EMISSÃO DA DPS', $dhEmi, true);
+        $this->drawField(self::X_L,  $r2y, self::W_C1, self::H_ROW7, 'NÚMERO DO DPS',                 $nDPS,  false, self::F_CAMPO_ID);
+        $this->drawField(self::X_C2, $r2y, self::W_C,  self::H_ROW7, 'SÉRIE DA DPS',                  $serie, false, self::F_CAMPO_ID);
+        $this->drawField(self::X_C3, $r2y, self::W_C,  self::H_ROW7, 'DATA E HORA DA EMISSÃO DA DPS', $dhEmi, false, self::F_CAMPO_ID);
 
-        // Row 3: Emitente | Situação | Finalidade
+        // Row 3: Emitente (cinza obrigatório per NT-008 §2.2.3) | Situação | Finalidade
         $r3y = $r2y + self::H_ROW7;
-        $this->drawField(self::X_L,  $r3y, self::W_C1, self::H_ROW7, 'EMITENTE DA NFS-E', $tpEmit, true);
-        $this->drawField(self::X_C2, $r3y, self::W_C,  self::H_ROW7, 'SITUAÇÃO DA NFS-E', $cStat, true);
-        $this->drawField(self::X_C3, $r3y, $qrX - self::X_C3, self::H_ROW7, 'FINALIDADE', $finNFSe, true);
+        $this->drawField(self::X_L,  $r3y, self::W_C1, self::H_ROW7, 'EMITENTE DA NFS-E', $tpEmit, true,  self::F_CAMPO_ID);
+        $this->drawField(self::X_C2, $r3y, self::W_C,  self::H_ROW7, 'SITUAÇÃO DA NFS-E', $cStat,  false, self::F_CAMPO_ID);
+        $this->drawField(self::X_C3, $r3y, self::W_C,  self::H_ROW7, 'FINALIDADE',         $finNFSe, false, self::F_CAMPO_ID);
 
         // QR code area spans rows 1-3
-        $this->pdf->Rect($qrX, $r1y, $wQrArea, self::H_ROW7 * 3, 'D');
         $this->drawQrCode($qrX + 0.5, $qrY, $qrSize, $qrUrl);
 
-        $qrComplY = $r1y + $qrSize + 1.5;
+        $qrComplX = self::X_QR2;
+        $qrComplY = $qrY + $qrSize + 0.5;
+        $qrComplW = (self::X_L + self::W_FULL) - self::X_QR2 - 0.5;
+        $qrComplH = ($y + $h) - $qrComplY - 0.5;
         $qrCompl  = 'A autenticidade desta NFS-e pode ser verificada pela leitura deste '
                   . 'código QR ou pela consulta da chave de acesso no portal nacional da NFS-e';
-        $this->pdf->textBox(self::X_QR2, $qrComplY, $wQrArea + (self::X_QR - self::X_QR2), 6.0,
-            $qrCompl, self::F_QR_COMPL, 'T', 'L', false, '');
+        $this->pdf->textBox($qrComplX, $qrComplY, $qrComplW, $qrComplH,
+            $qrCompl, ['font' => 'arial', 'size' => 6, 'style' => ''], 'T', 'L', false, '', false, 0);
 
         return $y + $h;
     }
@@ -559,10 +571,10 @@ class Danfse extends DaCommon
         $pAliq  = $this->getTagValue($tribMun, 'pAliqAplic') ?: '-';
         $tpRet  = $this->getTpRetISSQNLabel($this->getTagValue($tribMun, 'tpRetISSQN'));
         $vISSQN = $this->getTagValue($tribMun, 'vISSQN')     ?: '-';
-        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'BC ISSQN',          $vBC,    true);
-        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA APLICADA', $pAliq,  true);
-        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'RETENÇÃO DO ISSQN', $tpRet,  true);
-        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'ISSQN APURADO',     $vISSQN, true);
+        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'BC ISSQN',          $vBC);
+        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA APLICADA', $pAliq);
+        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'RETENÇÃO DO ISSQN', $tpRet);
+        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'ISSQN APURADO',     $vISSQN);
 
         return $y + $h;
     }
@@ -636,10 +648,10 @@ class Danfse extends DaCommon
         $pCBS    = $this->getTagValue($trib, 'pCBS')          ?: '0.00';
         $pEfCBS  = $this->getTagValue($trib, 'pAliqEfetCBS')  ?: '0.00';
         $vCBS    = $this->getTagValue($trib, 'vCBS')           ?: '0.00';
-        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO – IBS', $vIBSTot, true);
-        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA – CBS',              $pCBS,   true);
-        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA – CBS',         $pEfCBS, true);
-        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO – CBS',   $vCBS,   true);
+        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO – IBS', $vIBSTot);
+        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA – CBS',              $pCBS);
+        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA – CBS',         $pEfCBS);
+        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO – CBS',   $vCBS);
 
         return $y + $h;
     }
@@ -758,32 +770,34 @@ class Danfse extends DaCommon
     private function drawBlocoHeader(float $y, float $h, string $label): void
     {
         $this->pdf->SetFillColor(242, 242, 242);
-        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'F');
+        $this->pdf->Rect(self::X_L, $y, self::W_C1, $h, 'F');
+        $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->Line(self::X_L, $y, self::X_L + self::W_FULL, $y);
         $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
-        $this->pdf->textBox(self::X_L + 0.5, $y, self::W_FULL - 1.0, $h, strtoupper($label),
+        $this->pdf->textBox(self::X_L + 0.5, $y, self::W_C1 - 1.0, $h, strtoupper($label),
             self::F_BLOCO_TIT, 'C', 'L', false, '');
     }
 
     private function drawField(
         float $x, float $y, float $w, float $h,
         string $label, string $value,
-        bool $shade = false
+        bool $shade = false,
+        array $labelFont = self::F_CAMPO_TIT
     ): void {
         if ($shade) {
             $this->pdf->SetFillColor(242, 242, 242);
             $this->pdf->Rect($x, $y, $w, $h, 'F');
+            $this->pdf->SetFillColor(255, 255, 255);
         }
-        $this->pdf->textBox($x + 0.5, $y + 0.4, $w - 1.0, 2.8, $label,
-            self::F_CAMPO_TIT, 'T', 'L', false, '');
+        $displayLabel = ($labelFont['size'] === 6) ? ucwords(strtolower($label)) : $label;
+        $this->pdf->textBox($x + 0.5, $y + 0.4, $w - 1.0, 2.8, $displayLabel,
+            $labelFont, 'T', 'L', false, '');
         $this->pdf->textBox($x + 0.5, $y + 3.2, $w - 1.0, $h - 3.6, $value ?: '-',
             self::F_CONTEUDO, 'T', 'L', false, '');
     }
 
     private function drawSuppressedBlock(float $y, float $h, string $message): void
     {
-        $this->pdf->SetFillColor(242, 242, 242);
-        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'F');
         $this->pdf->Line(self::X_L, $y, self::X_L + self::W_FULL, $y);
         $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
         $this->pdf->textBox(self::X_L + 0.5, $y, self::W_FULL - 1.0, $h, strtoupper($message),
