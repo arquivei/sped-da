@@ -758,7 +758,9 @@ class Danfse extends DaCommon
     private function drawBlocoHeader(float $y, float $h, string $label): void
     {
         $this->pdf->SetFillColor(242, 242, 242);
-        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'FD');
+        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'F');
+        $this->pdf->Line(self::X_L, $y, self::X_L + self::W_FULL, $y);
+        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
         $this->pdf->textBox(self::X_L + 0.5, $y, self::W_FULL - 1.0, $h, strtoupper($label),
             self::F_BLOCO_TIT, 'C', 'L', false, '');
     }
@@ -772,7 +774,7 @@ class Danfse extends DaCommon
             $this->pdf->SetFillColor(242, 242, 242);
             $this->pdf->Rect($x, $y, $w, $h, 'F');
         }
-        $this->pdf->Rect($x, $y, $w, $h, 'D');
+        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
         $this->pdf->textBox($x + 0.5, $y + 0.4, $w - 1.0, 2.8, $label,
             self::F_CAMPO_TIT, 'T', 'L', false, '');
         $this->pdf->textBox($x + 0.5, $y + 3.2, $w - 1.0, $h - 3.6, $value ?: '-',
@@ -782,7 +784,9 @@ class Danfse extends DaCommon
     private function drawSuppressedBlock(float $y, float $h, string $message): void
     {
         $this->pdf->SetFillColor(242, 242, 242);
-        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'FD');
+        $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'F');
+        $this->pdf->Line(self::X_L, $y, self::X_L + self::W_FULL, $y);
+        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
         $this->pdf->textBox(self::X_L + 0.5, $y, self::W_FULL - 1.0, $h, strtoupper($message),
             self::F_BLOCO_TIT, 'C', 'C', false, '');
     }
