@@ -774,7 +774,6 @@ class Danfse extends DaCommon
             $this->pdf->SetFillColor(242, 242, 242);
             $this->pdf->Rect($x, $y, $w, $h, 'F');
         }
-        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
         $this->pdf->textBox($x + 0.5, $y + 0.4, $w - 1.0, 2.8, $label,
             self::F_CAMPO_TIT, 'T', 'L', false, '');
         $this->pdf->textBox($x + 0.5, $y + 3.2, $w - 1.0, $h - 3.6, $value ?: '-',
