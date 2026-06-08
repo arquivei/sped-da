@@ -247,8 +247,17 @@ class Danfse extends DaCommon
             self::F_QR_COMPL, 'T', 'R', false, '');
 
         $this->pdf->Rect(self::X_L, $y, 42.0, $h, 'D');
-        $this->pdf->textBox(self::X_L + 1.0, $y + 2.0, 40.0, 8.0,
-            'NFS-e', self::F_HEADER_CTR, 'C', 'C', false, '');
+        $logoPath = dirname(__DIR__, 2) . '/docs/logo-nfs-e-horizontal.png';
+        $logoW    = 38.0;
+        $logoH    = round($logoW * (389 / 1920), 2);
+        $logoX    = self::X_L + (42.0 - $logoW) / 2;
+        $logoY    = $y + ($h - $logoH) / 2;
+        if (file_exists($logoPath)) {
+            $this->pdf->Image($logoPath, $logoX, $logoY, $logoW, $logoH, 'PNG');
+        } else {
+            $this->pdf->textBox(self::X_L + 1.0, $y + 2.0, 40.0, 8.0,
+                'NFS-e', self::F_HEADER_CTR, 'C', 'C', false, '');
+        }
 
         $this->pdf->Rect(self::X_L, $y, self::W_FULL, $h, 'D');
 
