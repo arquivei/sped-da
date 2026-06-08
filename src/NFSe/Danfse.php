@@ -806,7 +806,7 @@ class Danfse extends DaCommon
         return $dt ?: '-';
     }
 
-    private function getMunicipioUF(?DOMElement $el): string
+    private function getMunicipioUF(?\DOMElement $el): string
     {
         if (empty($el)) {
             return '-';
@@ -826,7 +826,7 @@ class Danfse extends DaCommon
         return '-';
     }
 
-    private function getCodigoIbgeCep(?DOMElement $el): string
+    private function getCodigoIbgeCep(?\DOMElement $el): string
     {
         if (empty($el)) {
             return '-';
@@ -842,7 +842,7 @@ class Danfse extends DaCommon
         return '-';
     }
 
-    private function getEndereco(?DOMElement $el): string
+    private function getEndereco(?\DOMElement $el): string
     {
         if (empty($el)) {
             return '';
