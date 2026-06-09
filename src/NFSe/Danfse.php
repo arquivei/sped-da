@@ -797,10 +797,10 @@ class Danfse extends DaCommon
         $nNFSe     = $this->getTagValue($this->infNFSe, 'nNFSe') ?: '-';
         $nfseChave = "{$nNFSe} / {$chave}";
 
-        $this->drawBlocoHeader($y, $h, 'RECIBO DE ENTREGA');
+        $this->drawBlocoHeader($y, $h, ' ');
 
-        $this->drawField(self::X_L,  $y, self::W_C1,   $h, 'DATA CERTIFICAÇÃO',         '');
-        $this->drawField(self::X_C2, $y, self::W_C,    $h, 'IDENTIFICAÇÃO E ASSINATURA', '');
+        $this->drawField(self::X_L,  $y, self::W_C1,   $h, 'DATA CIENTIFICAÇÃO',         ' ');
+        $this->drawField(self::X_C2, $y, self::W_C,    $h, 'IDENTIFICAÇÃO E ASSINATURA', ' ');
         $this->drawField(self::X_C3, $y, self::W_WIDE, $h, 'Nº NFS-E / CHAVE NFS-E',    $nfseChave);
 
         return $y + $h;
