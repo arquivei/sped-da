@@ -126,6 +126,7 @@ class Danfse extends DaCommon
         $this->pdf->addPage();
         $this->calculaAlturaServico();
         $this->calculaAlturaInfoCompl();
+        $this->ajustaAlturaTotal();
 
         $totalDocH = $this->hCabecalho + $this->hDadosNfse + $this->hPrestador
             + $this->hTomador + $this->hDestinatario + $this->hIntermediario
@@ -265,6 +266,19 @@ class Danfse extends DaCommon
         if ($needed > $this->hInfoCompl) {
             $this->hInfoCompl = $needed;
         }
+    }
+
+    private function ajustaAlturaTotal(): void
+    {
+        $outros = $this->hCabecalho + $this->hDadosNfse + $this->hPrestador
+                + $this->hTomador + $this->hDestinatario + $this->hIntermediario
+                + $this->hServico + $this->hISSQN + $this->hTribFederal
+                + $this->hIBSCBS + $this->hValorTotal + $this->hCanhoto;
+
+        $maxInfoCompl = $this->hPrint - $outros;
+        $minInfoCompl = self::H_ROW + $this->pdf->fontSize + 2.0;
+
+        $this->hInfoCompl = max(min($this->hInfoCompl, $maxInfoCompl), $minInfoCompl);
     }
 
     // ── Bloco 1: Cabeçalho ────────────────────────────────────────────────────
@@ -574,9 +588,12 @@ class Danfse extends DaCommon
         $localPres = $this->getTagValue($locPres, 'cLocPres') ?: '-';
 
         // Descrição do código: xTribMun ?? xTribNac direto do infNFSe (§2.4.5 NT-008)
-        $xDescCod  = $this->getTagValue($this->infNFSe, 'xTribMun')
-                  ?: $this->getTagValue($this->infNFSe, 'xTribNac')
-                  ?: '';
+        $xDescCodRaw = $this->getTagValue($this->infNFSe, 'xTribMun')
+                    ?: $this->getTagValue($this->infNFSe, 'xTribNac')
+                    ?: '';
+        $xDescCod = iconv_strlen($xDescCodRaw, 'UTF-8') > 167
+            ? iconv_substr($xDescCodRaw, 0, 167, 'UTF-8') . '...'
+            : $xDescCodRaw;
         $xDescServ = $this->getTagValue($s, 'xDescServ') ?: '-';
 
         $this->drawBlocoHeader($y, self::H_ROW, 'SERVIÇO PRESTADO');
@@ -587,7 +604,7 @@ class Danfse extends DaCommon
         // Linha sem label (NT-008 §2.4.5: "Não há título (label) deste campo no DANFSe")
         $r1y = $y + self::H_ROW;
         $this->pdf->textBox(self::X_L + 0.5, $r1y + 0.5, self::W_FULL - 1.0, self::H_COD_SERV - 0.5,
-            $xDescCod, self::F_CONTEUDO, 'T', 'L', false, '');
+            $xDescCod, self::F_CONTEUDO, 'T', 'L', false, '', false, 0);
         $this->pdf->Line(self::X_DIV, $r1y + self::H_COD_SERV, self::X_DIV + self::W_DIV, $r1y + self::H_COD_SERV);
 
         $descY = $r1y + self::H_COD_SERV;
