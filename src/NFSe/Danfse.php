@@ -28,6 +28,7 @@ class Danfse extends DaCommon
     private const H_ROW      = 6.3;
     private const H_ROW7     = 6.7;
     private const H_MIN_SUPR = 3.2;
+    private const H_COD_SERV = 3.8; // linha sem label da descrição do código (NT-008 §2.4.5)
 
     private const F_BLOCO_TIT  = ['font' => 'arial', 'size' => 7, 'style' => 'B'];
     private const F_CAMPO_TIT  = ['font' => 'arial', 'size' => 6, 'style' => 'B'];
@@ -66,7 +67,7 @@ class Danfse extends DaCommon
     private float $hTomador       = 19.4;
     private float $hDestinatario  = 19.4;
     private float $hIntermediario = 19.4;
-    private float $hServico       = 16.9;
+    private float $hServico       = 16.4; // H_ROW + H_COD_SERV + H_ROW (mínimo)
     private float $hISSQN         = 25.9;
     private float $hTribFederal   = 13.0;
     private float $hIBSCBS        = 25.8;
@@ -123,6 +124,8 @@ class Danfse extends DaCommon
         $this->pdf->SetAutoPageBreak(false);
         $this->pdf->setMargins($this->margesq, $this->margsup);
         $this->pdf->addPage();
+        $this->calculaAlturaServico();
+        $this->calculaAlturaInfoCompl();
 
         $totalDocH = $this->hCabecalho + $this->hDadosNfse + $this->hPrestador
             + $this->hTomador + $this->hDestinatario + $this->hIntermediario
@@ -209,6 +212,59 @@ class Danfse extends DaCommon
         }
 
         $this->hInfoCompl += $freed;
+    }
+
+    private function calculaAlturaServico(): void
+    {
+        $s         = $this->serv;
+        $xDescServ = $s ? ($this->getTagValue($s, 'xDescServ') ?: '') : '';
+
+        $this->pdf->SetFont(
+            self::F_CONTEUDO['font'],
+            self::F_CONTEUDO['style'],
+            self::F_CONTEUDO['size']
+        );
+        $lineH     = $this->pdf->fontSize;
+        $textWidth = self::W_FULL - 1.0;
+
+        if (!empty($xDescServ)) {
+            $text   = html_entity_decode(utf8_decode($xDescServ));
+            $nLines = $this->pdf->wordWrap($text, $textWidth);
+        } else {
+            $nLines = 1;
+        }
+
+        // label area (3.2mm) + nLines × lineH + bottom padding (0.4mm)
+        $descH = max(self::H_ROW, $nLines * $lineH + 3.6);
+        $this->hServico = self::H_ROW + self::H_COD_SERV + $descH;
+    }
+
+    private function calculaAlturaInfoCompl(): void
+    {
+        $ic = $this->infDPS
+            ? $this->infDPS->getElementsByTagName('infoCompl')->item(0)
+            : null;
+        $xInfComp = $this->getTagValue($ic, 'xInfComp') ?: '';
+
+        $this->pdf->SetFont(
+            self::F_CONTEUDO['font'],
+            self::F_CONTEUDO['style'],
+            self::F_CONTEUDO['size']
+        );
+        $lineH     = $this->pdf->fontSize;
+        $textWidth = self::W_FULL - 1.0;
+
+        if (!empty($xInfComp)) {
+            $text   = html_entity_decode(utf8_decode($xInfComp));
+            $nLines = $this->pdf->wordWrap($text, $textWidth);
+        } else {
+            $nLines = 1;
+        }
+
+        $needed = self::H_ROW + ($nLines * $lineH) + 2.0;
+        if ($needed > $this->hInfoCompl) {
+            $this->hInfoCompl = $needed;
+        }
     }
 
     // ── Bloco 1: Cabeçalho ────────────────────────────────────────────────────
@@ -517,22 +573,25 @@ class Danfse extends DaCommon
         $locPres   = $s ? $s->getElementsByTagName('locPres')->item(0) : null;
         $localPres = $this->getTagValue($locPres, 'cLocPres') ?: '-';
 
-        $xDescServCod = $this->getTagValue($cServ, 'xDescServ') ?: '';
-        $xDescServ    = $this->getTagValue($s, 'xDescServ') ?: '-';
+        // Descrição do código: xTribMun ?? xTribNac direto do infNFSe (§2.4.5 NT-008)
+        $xDescCod  = $this->getTagValue($this->infNFSe, 'xTribMun')
+                  ?: $this->getTagValue($this->infNFSe, 'xTribNac')
+                  ?: '';
+        $xDescServ = $this->getTagValue($s, 'xDescServ') ?: '-';
 
         $this->drawBlocoHeader($y, self::H_ROW, 'SERVIÇO PRESTADO');
         $this->drawField(self::X_C2, $y, self::W_C,  self::H_ROW, 'CÓDIGO DE TRIBUTAÇÃO NAC./MUN.', $codTrib);
         $this->drawField(self::X_C3, $y, self::W_C,  self::H_ROW, 'CÓDIGO DA NBS',                  $cNBS);
         $this->drawField(self::X_C4, $y, self::W_C,  self::H_ROW, 'LOCAL DA PRESTAÇÃO',             $localPres);
 
+        // Linha sem label (NT-008 §2.4.5: "Não há título (label) deste campo no DANFSe")
         $r1y = $y + self::H_ROW;
-        $r1h = 4.0;
-        $this->pdf->textBox(self::X_L + 0.5, $r1y + 0.5, self::W_FULL - 1.0, $r1h - 1.0,
-            $xDescServCod, self::F_CONTEUDO, 'T', 'L', false, '');
-        $this->pdf->Line(self::X_DIV, $r1y + $r1h, self::X_DIV + self::W_DIV, $r1y + $r1h);
+        $this->pdf->textBox(self::X_L + 0.5, $r1y + 0.5, self::W_FULL - 1.0, self::H_COD_SERV - 0.5,
+            $xDescCod, self::F_CONTEUDO, 'T', 'L', false, '');
+        $this->pdf->Line(self::X_DIV, $r1y + self::H_COD_SERV, self::X_DIV + self::W_DIV, $r1y + self::H_COD_SERV);
 
-        $descY = $r1y + $r1h;
-        $descH = $h - self::H_ROW - $r1h;
+        $descY = $r1y + self::H_COD_SERV;
+        $descH = $h - self::H_ROW - self::H_COD_SERV;
         $this->drawField(self::X_L, $descY, self::W_FULL, $descH, 'Descrição do Serviço', $xDescServ);
 
         return $y + $h;
