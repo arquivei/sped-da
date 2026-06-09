@@ -16,6 +16,8 @@ class Danfse extends DaCommon
     private const X_C4  = 156.5;
     private const X_QR  = 174.0;
     private const X_QR2 = 156.5;
+    private const X_DIV =   4.0;  // X_L + 2mm inset
+    private const W_DIV = 202.0;  // W_FULL - 4mm (2mm each side)
 
     private const W_FULL = 206.0;
     private const W_C1   =  51.5;
@@ -40,6 +42,7 @@ class Danfse extends DaCommon
     private Dom $dom;
     private \DOMElement $infNFSe;
     private ?\DOMElement $infDPS      = null;
+    private ?\DOMElement $emit        = null;
     private ?\DOMElement $prest       = null;
     private ?\DOMElement $toma        = null;
     private ?\DOMElement $dest        = null;
@@ -91,6 +94,8 @@ class Danfse extends DaCommon
             throw new \InvalidArgumentException('XML inválido: tag infNFSe não encontrada.');
         }
 
+        $this->emit    = $this->infNFSe->getElementsByTagName('emit')->item(0);
+
         $dps           = $this->dom->getElementsByTagName('DPS')->item(0);
         $this->infDPS  = $dps ? $dps->getElementsByTagName('infDPS')->item(0) : null;
         $this->prest   = $this->infDPS ? $this->infDPS->getElementsByTagName('prest')->item(0)   : null;
@@ -123,8 +128,6 @@ class Danfse extends DaCommon
             + $this->hTomador + $this->hDestinatario + $this->hIntermediario
             + $this->hServico + $this->hISSQN + $this->hTribFederal
             + $this->hIBSCBS + $this->hValorTotal + $this->hInfoCompl + $this->hCanhoto;
-        $this->pdf->SetLineWidth(0.35);
-        $this->pdf->Rect(self::X_L, $this->margsup, self::W_FULL, $totalDocH, 'D');
         $this->pdf->SetLineWidth(0.18);
 
         $y = (float) $this->margsup;
@@ -147,6 +150,11 @@ class Danfse extends DaCommon
         }
 
         $this->watermark();
+
+        // Borda externa desenhada por último para não ser coberta pelos fills
+        $this->pdf->SetLineWidth(0.35);
+        $this->pdf->Rect(self::X_L, $this->margsup, self::W_FULL, $totalDocH, 'D');
+        $this->pdf->SetLineWidth(0.18);
     }
 
     private function calculaLayout(): void
@@ -270,7 +278,7 @@ class Danfse extends DaCommon
                 'NFS-e', self::F_HEADER_CTR, 'C', 'C', false, '');
         }
 
-        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
+        $this->pdf->Line(self::X_DIV, $y + $h, self::X_DIV + self::W_DIV, $y + $h);
 
         return $y + $h;
     }
@@ -341,30 +349,33 @@ class Danfse extends DaCommon
     {
         $h = $this->hPrestador;
         $p = $this->prest;
+        $e = $this->emit;
 
         $this->drawBlocoHeader($y, self::H_ROW, 'PRESTADOR / FORNECEDOR');
 
         $cnpjCpfNif = $this->formatCnpjCpfNif(
-            $this->getTagValue($p, 'CNPJ'),
-            $this->getTagValue($p, 'CPF'),
-            $this->getTagValue($p, 'NIF')
+            $this->getTagValue($p, 'CNPJ') ?: $this->getTagValue($e, 'CNPJ'),
+            $this->getTagValue($p, 'CPF')  ?: $this->getTagValue($e, 'CPF'),
+            $this->getTagValue($p, 'NIF')  ?: $this->getTagValue($e, 'NIF')
         );
+        $im    = $this->getTagValue($p, 'IM')    ?: $this->getTagValue($e, 'IM');
+        $fone  = $this->getTagValue($p, 'fone')  ?: $this->getTagValue($e, 'fone');
+        $xNome = $this->getTagValue($p, 'xNome') ?: $this->getTagValue($e, 'xNome');
+        $email = $this->getTagValue($p, 'email') ?: $this->getTagValue($e, 'email');
 
         $this->drawField(self::X_C2, $y, self::W_C,  self::H_ROW, 'CNPJ / CPF / NIF',           $cnpjCpfNif);
-        $this->drawField(self::X_C3, $y, self::W_C,  self::H_ROW, 'INDICADOR MUNICIPAL (INSC.)', $this->getTagValue($p, 'IM'));
-        $this->drawField(self::X_C4, $y, self::W_C,  self::H_ROW, 'TELEFONE',                    $this->getTagValue($p, 'fone'));
+        $this->drawField(self::X_C3, $y, self::W_C,  self::H_ROW, 'INDICADOR MUNICIPAL (INSC.)', $im);
+        $this->drawField(self::X_C4, $y, self::W_C,  self::H_ROW, 'TELEFONE',                    $fone);
 
         $r1y = $y + self::H_ROW;
-        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, 'NOME / NOME EMPRESARIAL', $this->getTagValue($p, 'xNome'));
-        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, 'MUNICÍPIO / SIGLA UF',    $this->getMunicipioUF($p));
-        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($p));
+        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, 'NOME / NOME EMPRESARIAL', $xNome);
+        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, 'MUNICÍPIO / SIGLA UF',    $this->getMunicipioUF($e ?? $p));
+        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($e ?? $p));
 
-        $r2y     = $r1y + self::H_ROW;
-        $endereco = $this->getEndereco($p);
-        $email    = $this->getTagValue($p, 'email');
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, '*Endereço', $endereco);
-        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',         ' ');
-        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, '*E-mail',   $email);
+        $r2y = $r1y + self::H_ROW;
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($e ?? $p));
+        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
+        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $email);
 
         $r3y     = $r2y + self::H_ROW;
         $regTrib = $p ? $p->getElementsByTagName('regTrib')->item(0) : null;
@@ -406,9 +417,9 @@ class Danfse extends DaCommon
         $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($t));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, '*Endereço', $this->getEndereco($t));
-        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',         ' ');
-        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, '*E-mail',   $this->getTagValue($t, 'email'));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($t));
+        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
+        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $this->getTagValue($t, 'email'));
 
         return $y + $h;
     }
@@ -447,9 +458,9 @@ class Danfse extends DaCommon
         $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($d));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, '*Endereço', $this->getEndereco($d));
-        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',         ' ');
-        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, '*E-mail',   $this->getTagValue($d, 'email'));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($d));
+        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
+        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $this->getTagValue($d, 'email'));
 
         return $y + $h;
     }
@@ -484,9 +495,9 @@ class Danfse extends DaCommon
         $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($i));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, '*Endereço', $this->getEndereco($i));
-        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',         ' ');
-        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, '*E-mail',   $this->getTagValue($i, 'email'));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($i));
+        $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
+        $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $this->getTagValue($i, 'email'));
 
         return $y + $h;
     }
@@ -515,13 +526,13 @@ class Danfse extends DaCommon
         $this->drawField(self::X_C4, $y, self::W_C,  self::H_ROW, 'LOCAL DA PRESTAÇÃO',             $localPres);
 
         $r1y = $y + self::H_ROW;
-        $r1h = self::H_ROW;
-        $this->pdf->Rect(self::X_L, $r1y, self::W_FULL, $r1h, 'D');
+        $r1h = 4.0;
         $this->pdf->textBox(self::X_L + 0.5, $r1y + 0.5, self::W_FULL - 1.0, $r1h - 1.0,
             $xDescServCod, self::F_CONTEUDO, 'T', 'L', false, '');
+        $this->pdf->Line(self::X_DIV, $r1y + $r1h, self::X_DIV + self::W_DIV, $r1y + $r1h);
 
         $descY = $r1y + $r1h;
-        $descH = $h - self::H_ROW * 2;
+        $descH = $h - self::H_ROW - $r1h;
         $this->drawField(self::X_L, $descY, self::W_FULL, $descH, 'Descrição do Serviço', $xDescServ);
 
         return $y + $h;
@@ -551,20 +562,20 @@ class Danfse extends DaCommon
         $tpImun = $this->getTagValue($tribMun, 'tpImunidade') ?: '-';
         $tpSusp = $this->getTagValue($tribMun, 'tpSusp')      ?: '-';
         $nProc  = $this->getTagValue($tribMun, 'nProcess')    ?: '-';
-        $this->drawField(self::X_L,  $r1y, self::W_C, self::H_ROW, '**Regime Especial de Tributação', $regEsp);
-        $this->drawField(self::X_C2, $r1y, self::W_C, self::H_ROW, '**Tipo de Imunidade',             $tpImun);
-        $this->drawField(self::X_C3, $r1y, self::W_C, self::H_ROW, '**Suspensão da Exigibilidade',    $tpSusp);
-        $this->drawField(self::X_C4, $r1y, self::W_C, self::H_ROW, '**Número Processo Suspensão',     $nProc);
+        $this->drawField(self::X_L,  $r1y, self::W_C, self::H_ROW, 'Regime Especial de Tributação', $regEsp);
+        $this->drawField(self::X_C2, $r1y, self::W_C, self::H_ROW, 'Tipo de Imunidade',             $tpImun);
+        $this->drawField(self::X_C3, $r1y, self::W_C, self::H_ROW, 'Suspensão da Exigibilidade',    $tpSusp);
+        $this->drawField(self::X_C4, $r1y, self::W_C, self::H_ROW, 'Número Processo Suspensão',     $nProc);
 
         $r2y  = $r1y + self::H_ROW;
         $tpBM = $this->getTagValue($tribMun, 'tpBM')        ?: '-';
         $vBM  = $this->getTagValue($tribMun, 'vCalcBM')     ?: ($this->getTagValue($tribMun, 'vRedBCM') ?: '-');
         $vDed = $this->getTagValue($tribMun, 'vDR')         ?: ($this->getTagValue($tribMun, 'vCalcDR') ?: '-');
         $vDI  = $this->getTagValue($tribMun, 'vDescIncond') ?: '-';
-        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, '**Benefício Municipal',    $tpBM);
-        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, '**Cálculo do BM',           $vBM);
-        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, '**Total Deduções/Reduções', $vDed);
-        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, '**Desconto Incondicionado', $vDI);
+        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'Benefício Municipal',    $tpBM);
+        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'Cálculo do BM',           $vBM);
+        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'Total Deduções/Reduções', $vDed);
+        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'Desconto Incondicionado', $vDI);
 
         $r3y    = $r2y + self::H_ROW;
         $vBC    = $this->getTagValue($tribMun, 'vBC')        ?: '-';
@@ -591,16 +602,16 @@ class Danfse extends DaCommon
         $vCP   = $this->getTagValue($tribFed, 'vRetCP')    ?: '-';
         $vCSLL = $this->getTagValue($tribFed, 'vRetCSLL')  ?: '-';
         $this->drawField(self::X_C2, $y, self::W_C, self::H_ROW, 'IRRF',                             $vIRRF);
-        $this->drawField(self::X_C3, $y, self::W_C, self::H_ROW, 'CONTRIB. PREVIDENCIÁRIA – RETIDA', $vCP);
-        $this->drawField(self::X_C4, $y, self::W_C, self::H_ROW, 'CONTRIBUIÇÕES SOCIAIS – RETIDAS',  $vCSLL);
+        $this->drawField(self::X_C3, $y, self::W_C, self::H_ROW, 'CONTRIB. PREVIDENCIÁRIA - RETIDA', $vCP);
+        $this->drawField(self::X_C4, $y, self::W_C, self::H_ROW, 'CONTRIBUIÇÕES SOCIAIS - RETIDAS',  $vCSLL);
 
         $r1y    = $y + self::H_ROW;
         $vPIS   = $this->getTagValue($tribFed, 'vPIS')            ?: '-';
         $vCofins = $this->getTagValue($tribFed, 'vCofins')        ?: '-';
         $tpRet  = $this->getTagValue($tribFed, 'tpRetPisCofins')  ?: '-';
-        $this->drawField(self::X_L,  $r1y, self::W_C,    self::H_ROW, '***PIS – Déb. Apuração Própria',    $vPIS);
-        $this->drawField(self::X_C2, $r1y, self::W_C,    self::H_ROW, '***COFINS – Déb. Apuração Própria', $vCofins);
-        $this->drawField(self::X_C3, $r1y, self::W_WIDE, self::H_ROW, '***Descrição Contrib. Sociais',     $tpRet);
+        $this->drawField(self::X_L,  $r1y, self::W_C,    self::H_ROW, 'PIS - Déb. Apuração Própria',    $vPIS);
+        $this->drawField(self::X_C2, $r1y, self::W_C,    self::H_ROW, 'COFINS - Déb. Apuração Própria', $vCofins);
+        $this->drawField(self::X_C3, $r1y, self::W_WIDE, self::H_ROW, 'Descrição Contrib. Sociais',     $tpRet);
 
         return $y + $h;
     }
@@ -638,20 +649,20 @@ class Danfse extends DaCommon
         $vIBSMun = $this->getTagValue($trib, 'vIBSMun')      ?: '0.00';
         $pEfUF   = $this->getTagValue($trib, 'pAliqEfetUF')  ?: '0.00';
         $vIBSUF  = $this->getTagValue($trib, 'vIBSUF')       ?: '0.00';
-        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA MUNICIPAL – IBS', $pEfMun);
-        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO MUNICIPAL – IBS',  $vIBSMun);
-        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA ESTADUAL – IBS',  $pEfUF);
-        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO ESTADUAL – IBS',  $vIBSUF);
+        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA MUNICIPAL - IBS', $pEfMun);
+        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO MUNICIPAL - IBS',  $vIBSMun);
+        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA ESTADUAL - IBS',  $pEfUF);
+        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO ESTADUAL - IBS',  $vIBSUF);
 
         $r3y     = $r2y + self::H_ROW;
         $vIBSTot = $this->getTagValue($trib, 'vIBSTot')      ?: '0.00';
         $pCBS    = $this->getTagValue($trib, 'pCBS')          ?: '0.00';
         $pEfCBS  = $this->getTagValue($trib, 'pAliqEfetCBS')  ?: '0.00';
         $vCBS    = $this->getTagValue($trib, 'vCBS')           ?: '0.00';
-        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO – IBS', $vIBSTot);
-        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA – CBS',              $pCBS);
-        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA – CBS',         $pEfCBS);
-        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO – CBS',   $vCBS);
+        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO - IBS', $vIBSTot);
+        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA - CBS',              $pCBS);
+        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA - CBS',         $pEfCBS);
+        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO - CBS',   $vCBS);
 
         return $y + $h;
     }
@@ -708,7 +719,6 @@ class Danfse extends DaCommon
 
         $textY = $y + $hdr;
         $textH = $h - $hdr;
-        $this->pdf->Rect(self::X_L, $textY, self::W_FULL, $textH, 'D');
         $this->pdf->textBox(
             self::X_L + 0.5, $textY + 0.5,
             self::W_FULL - 1.0, $textH - 1.0,
@@ -772,8 +782,7 @@ class Danfse extends DaCommon
         $this->pdf->SetFillColor(242, 242, 242);
         $this->pdf->Rect(self::X_L, $y, self::W_C1, $h, 'F');
         $this->pdf->SetFillColor(255, 255, 255);
-        $this->pdf->Line(self::X_L, $y, self::X_L + self::W_FULL, $y);
-        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
+        $this->pdf->Line(self::X_DIV, $y, self::X_DIV + self::W_DIV, $y);
         $this->pdf->textBox(self::X_L + 0.5, $y, self::W_C1 - 1.0, $h, strtoupper($label),
             self::F_BLOCO_TIT, 'C', 'L', false, '');
     }
@@ -789,7 +798,7 @@ class Danfse extends DaCommon
             $this->pdf->Rect($x, $y, $w, $h, 'F');
             $this->pdf->SetFillColor(255, 255, 255);
         }
-        $displayLabel = ($labelFont['size'] === 6) ? ucwords(strtolower($label)) : $label;
+        $displayLabel = ($labelFont['size'] === 6) ? $this->toTitleCase($label) : $label;
         $this->pdf->textBox($x + 0.5, $y + 0.4, $w - 1.0, 2.8, $displayLabel,
             $labelFont, 'T', 'L', false, '');
         $this->pdf->textBox($x + 0.5, $y + 3.2, $w - 1.0, $h - 3.6, $value ?: '-',
@@ -798,8 +807,8 @@ class Danfse extends DaCommon
 
     private function drawSuppressedBlock(float $y, float $h, string $message): void
     {
-        $this->pdf->Line(self::X_L, $y, self::X_L + self::W_FULL, $y);
-        $this->pdf->Line(self::X_L, $y + $h, self::X_L + self::W_FULL, $y + $h);
+        $this->pdf->Line(self::X_DIV, $y, self::X_DIV + self::W_DIV, $y);
+        $this->pdf->Line(self::X_DIV, $y + $h, self::X_DIV + self::W_DIV, $y + $h);
         $this->pdf->textBox(self::X_L + 0.5, $y, self::W_FULL - 1.0, $h, strtoupper($message),
             self::F_BLOCO_TIT, 'C', 'C', false, '');
     }
@@ -816,17 +825,17 @@ class Danfse extends DaCommon
     private function formatCnpjCpfNif(string $cnpj, string $cpf, string $nif): string
     {
         if (!empty($cnpj) && strlen($cnpj) === 14) {
-            return (string) preg_replace('/(d{2})(d{3})(d{3})(d{4})(d{2})/', '$1.$2.$3/$4-$5', $cnpj);
+            return (string) preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $cnpj);
         }
         if (!empty($cpf) && strlen($cpf) === 11) {
-            return (string) preg_replace('/(d{3})(d{3})(d{3})(d{2})/', '$1.$2.$3-$4', $cpf);
+            return (string) preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $cpf);
         }
         return !empty($nif) ? $nif : '-';
     }
 
     private function formatDatetime(string $dt): string
     {
-        if (preg_match('/^(d{4})-(d{2})-(d{2})T(d{2}:d{2}:d{2})/', $dt, $m)) {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})/', $dt, $m)) {
             return "{$m[3]}/{$m[2]}/{$m[1]} {$m[4]}";
         }
         return $dt ?: '-';
@@ -837,11 +846,24 @@ class Danfse extends DaCommon
         if (empty($el)) {
             return '-';
         }
-        $endNac = $el->getElementsByTagName('endNac')->item(0);
-        if ($endNac) {
-            $xMun = $this->getTagValue($endNac, 'xMun');
-            $uf   = $this->getTagValue($endNac, 'UF');
-            return $xMun && $uf ? "{$xMun} / {$uf}" : ($xMun ?: '-');
+        // Resolve the address node: endNac/enderNac directly under el, or end/endNac for toma
+        $addrNode = $el->getElementsByTagName('endNac')->item(0)
+                 ?: $el->getElementsByTagName('enderNac')->item(0);
+        if (!$addrNode) {
+            $end = $el->getElementsByTagName('end')->item(0);
+            $addrNode = $end
+                ? ($end->getElementsByTagName('endNac')->item(0) ?: $end->getElementsByTagName('enderNac')->item(0))
+                : null;
+        }
+        if ($addrNode) {
+            $xMun = $this->getTagValue($addrNode, 'xMun');
+            $uf   = $this->getTagValue($addrNode, 'UF');
+            $cMun = $this->getTagValue($addrNode, 'cMun');
+            if ($xMun && $uf) return "{$xMun} / {$uf}";
+            if ($xMun)        return $xMun;
+            if ($cMun && $uf) return "{$cMun} / {$uf}";
+            if ($uf)          return $uf;
+            if ($cMun)        return $cMun;
         }
         $endExt = $el->getElementsByTagName('endExt')->item(0);
         if ($endExt) {
@@ -857,15 +879,33 @@ class Danfse extends DaCommon
         if (empty($el)) {
             return '-';
         }
-        $endNac = $el->getElementsByTagName('endNac')->item(0);
-        if ($endNac) {
-            $cMun = $this->getTagValue($endNac, 'cMun');
-            $cep  = $this->getTagValue($endNac, 'CEP');
-            if ($cMun && $cep) {
-                return "{$cMun} / " . (string) preg_replace('/(d{5})(d{3})/', '$1-$2', $cep);
+        $addrNode = $el->getElementsByTagName('endNac')->item(0)
+                 ?: $el->getElementsByTagName('enderNac')->item(0);
+        if (!$addrNode) {
+            $end = $el->getElementsByTagName('end')->item(0);
+            $addrNode = $end
+                ? ($end->getElementsByTagName('endNac')->item(0) ?: $end->getElementsByTagName('enderNac')->item(0))
+                : null;
+        }
+        if ($addrNode) {
+            $cMun = $this->getTagValue($addrNode, 'cMun');
+            $cep  = $this->getTagValue($addrNode, 'CEP');
+            if ($cMun || $cep) {
+                $cepFmt = $cep ? (string) preg_replace('/(\d{5})(\d{3})/', '$1-$2', $cep) : '';
+                return $cMun && $cepFmt ? "{$cMun} / {$cepFmt}" : ($cMun ?: $cepFmt ?: '-');
             }
         }
         return '-';
+    }
+
+    private function toTitleCase(string $text): string
+    {
+        $lower = str_replace(
+            ['Á','É','Í','Ó','Ú','Â','Ê','Î','Ô','Û','À','Ã','Õ','Ç'],
+            ['á','é','í','ó','ú','â','ê','î','ô','û','à','ã','õ','ç'],
+            strtolower($text)
+        );
+        return ucwords($lower);
     }
 
     private function getEndereco(?\DOMElement $el): string
@@ -873,16 +913,37 @@ class Danfse extends DaCommon
         if (empty($el)) {
             return '';
         }
-        $end = $el->getElementsByTagName('endNac')->item(0)
-            ?: $el->getElementsByTagName('endExt')->item(0);
-        if (empty($end)) {
-            return '';
+        // Case 1: endNac/enderNac directly under el and xLgr is inside it (standard or emit structure)
+        $addrNode = $el->getElementsByTagName('endNac')->item(0)
+                 ?: $el->getElementsByTagName('enderNac')->item(0);
+        if ($addrNode && $this->getTagValue($addrNode, 'xLgr')) {
+            $parts = array_filter([
+                $this->getTagValue($addrNode, 'xLgr'),
+                $this->getTagValue($addrNode, 'nro'),
+                $this->getTagValue($addrNode, 'xCpl'),
+                $this->getTagValue($addrNode, 'xBairro'),
+            ]);
+            return implode(', ', $parts) ?: '';
         }
+        // Case 2: <end> wrapper with xLgr as direct child (toma structure in real NFSe XMLs)
+        $end = $el->getElementsByTagName('end')->item(0);
+        if ($end) {
+            $parts = array_filter([
+                $this->getTagValue($end, 'xLgr'),
+                $this->getTagValue($end, 'nro'),
+                $this->getTagValue($end, 'xCpl'),
+                $this->getTagValue($end, 'xBairro'),
+            ]);
+            if ($parts) {
+                return implode(', ', $parts);
+            }
+        }
+        // Case 3: xLgr as direct child of el (fallback)
         $parts = array_filter([
-            $this->getTagValue($end, 'xLgr'),
-            $this->getTagValue($end, 'nro'),
-            $this->getTagValue($end, 'xCpl'),
-            $this->getTagValue($end, 'xBairro'),
+            $this->getTagValue($el, 'xLgr'),
+            $this->getTagValue($el, 'nro'),
+            $this->getTagValue($el, 'xCpl'),
+            $this->getTagValue($el, 'xBairro'),
         ]);
         return implode(', ', $parts) ?: '';
     }
