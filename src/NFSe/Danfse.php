@@ -40,6 +40,13 @@ class Danfse extends DaCommon
     private const F_HOMOLOG    = ['font' => 'arial', 'size' => 9, 'style' => 'B'];
     private const F_WATERMARK  = ['font' => 'arial', 'size' => 50, 'style' => ''];
 
+    private const LBL_CNPJ_CPF_NIF    = 'CNPJ / CPF / NIF';
+    private const LBL_INSC_MUN        = 'INDICADOR MUNICIPAL (INSC.)';
+    private const LBL_NOME_EMPRESARIAL = 'NOME / NOME EMPRESARIAL';
+    private const LBL_MUNICIPIO_UF    = 'MUNICÍPIO / SIGLA UF';
+    private const LBL_CODIGO_IBGE_CEP = 'CÓDIGO IBGE / CEP';
+    private const LBL_ENDERECO        = 'Endereço';
+
     private Dom $dom;
     private \DOMElement $infNFSe;
     private ?\DOMElement $infDPS      = null;
@@ -116,7 +123,7 @@ class Danfse extends DaCommon
         $this->showCanhoto = $show;
     }
 
-    protected function monta($logo = null): void
+    protected function monta(): void
     {
         $this->calculaLayout();
 
@@ -186,6 +193,11 @@ class Danfse extends DaCommon
             $this->hasTribFederal = ($year <= 2026);
         }
 
+        $this->hInfoCompl += $this->ajustaAlturasSuprimidas();
+    }
+
+    private function ajustaAlturasSuprimidas(): float
+    {
         $freed = 0.0;
         if (!$this->hasTomador) {
             $freed              += $this->hTomador - self::H_MIN_SUPR;
@@ -211,14 +223,14 @@ class Danfse extends DaCommon
             $freed         += $this->hCanhoto;
             $this->hCanhoto = 0.0;
         }
-
-        $this->hInfoCompl += $freed;
+        return $freed;
     }
 
     private function calculaAlturaServico(): void
     {
-        $s         = $this->serv;
-        $xDescServ = $s ? ($this->getTagValue($s, 'xDescServ') ?: '') : '';
+        $s           = $this->serv;
+        $rawDescServ = $s ? $this->getTagValue($s, 'xDescServ') : null;
+        $xDescServ   = $rawDescServ ?: '';
 
         $this->pdf->SetFont(
             self::F_CONTEUDO['font'],
@@ -311,7 +323,8 @@ class Danfse extends DaCommon
 
         $xLocEmi    = $this->getTagValue($this->infNFSe, 'xLocEmi');
         $uf         = $this->getTagValue($this->infNFSe, 'UF');
-        $mun        = $xLocEmi && $uf ? "Município: {$xLocEmi} / {$uf}" : ($xLocEmi ?: '-');
+        $munFallback = $xLocEmi ?: '-';
+        $mun         = $xLocEmi && $uf ? "Município: {$xLocEmi} / {$uf}" : $munFallback;
         $ambGer     = $this->getTagValue($this->infNFSe, 'ambGer');
         $tpAmbLabel = ($tpAmb === '1') ? 'Produção' : 'Homologação';
 
@@ -433,17 +446,17 @@ class Danfse extends DaCommon
         $xNome = $this->getTagValue($p, 'xNome') ?: $this->getTagValue($e, 'xNome');
         $email = $this->getTagValue($p, 'email') ?: $this->getTagValue($e, 'email');
 
-        $this->drawField(self::X_C2, $y, self::W_C,  self::H_ROW, 'CNPJ / CPF / NIF',           $cnpjCpfNif);
-        $this->drawField(self::X_C3, $y, self::W_C,  self::H_ROW, 'INDICADOR MUNICIPAL (INSC.)', $im);
-        $this->drawField(self::X_C4, $y, self::W_C,  self::H_ROW, 'TELEFONE',                    $fone);
+        $this->drawField(self::X_C2, $y, self::W_C,  self::H_ROW, self::LBL_CNPJ_CPF_NIF,    $cnpjCpfNif);
+        $this->drawField(self::X_C3, $y, self::W_C,  self::H_ROW, self::LBL_INSC_MUN,        $im);
+        $this->drawField(self::X_C4, $y, self::W_C,  self::H_ROW, 'TELEFONE',                 $fone);
 
         $r1y = $y + self::H_ROW;
-        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, 'NOME / NOME EMPRESARIAL', $xNome);
-        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, 'MUNICÍPIO / SIGLA UF',    $this->getMunicipioUF($e ?? $p));
-        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($e ?? $p));
+        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, self::LBL_NOME_EMPRESARIAL, $xNome);
+        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, self::LBL_MUNICIPIO_UF,    $this->getMunicipioUF($e ?? $p));
+        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, self::LBL_CODIGO_IBGE_CEP, $this->getCodigoIbgeCep($e ?? $p));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($e ?? $p));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, self::LBL_ENDERECO, $this->getEndereco($e ?? $p));
         $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
         $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $email);
 
@@ -477,17 +490,17 @@ class Danfse extends DaCommon
             $this->getTagValue($t, 'NIF')
         );
 
-        $this->drawField(self::X_C2, $y, self::W_C, self::H_ROW, 'CNPJ / CPF / NIF',           $cnpjCpfNif);
-        $this->drawField(self::X_C3, $y, self::W_C, self::H_ROW, 'INDICADOR MUNICIPAL (INSC.)', $this->getTagValue($t, 'IM'));
-        $this->drawField(self::X_C4, $y, self::W_C, self::H_ROW, 'TELEFONE',                    $this->getTagValue($t, 'fone'));
+        $this->drawField(self::X_C2, $y, self::W_C, self::H_ROW, self::LBL_CNPJ_CPF_NIF,    $cnpjCpfNif);
+        $this->drawField(self::X_C3, $y, self::W_C, self::H_ROW, self::LBL_INSC_MUN,        $this->getTagValue($t, 'IM'));
+        $this->drawField(self::X_C4, $y, self::W_C, self::H_ROW, 'TELEFONE',                 $this->getTagValue($t, 'fone'));
 
         $r1y = $y + self::H_ROW;
-        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, 'NOME / NOME EMPRESARIAL', $this->getTagValue($t, 'xNome'));
-        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, 'MUNICÍPIO / SIGLA UF',    $this->getMunicipioUF($t));
-        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($t));
+        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, self::LBL_NOME_EMPRESARIAL, $this->getTagValue($t, 'xNome'));
+        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, self::LBL_MUNICIPIO_UF,    $this->getMunicipioUF($t));
+        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, self::LBL_CODIGO_IBGE_CEP, $this->getCodigoIbgeCep($t));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($t));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, self::LBL_ENDERECO, $this->getEndereco($t));
         $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
         $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $this->getTagValue($t, 'email'));
 
@@ -519,16 +532,16 @@ class Danfse extends DaCommon
             $this->getTagValue($d, 'NIF')
         );
 
-        $this->drawField(self::X_C2, $y, self::W_WIDE, self::H_ROW, 'CNPJ / CPF / NIF', $cnpjCpfNif);
-        $this->drawField(self::X_C4, $y, self::W_C,    self::H_ROW, 'TELEFONE',          $this->getTagValue($d, 'fone'));
+        $this->drawField(self::X_C2, $y, self::W_WIDE, self::H_ROW, self::LBL_CNPJ_CPF_NIF, $cnpjCpfNif);
+        $this->drawField(self::X_C4, $y, self::W_C,    self::H_ROW, 'TELEFONE',              $this->getTagValue($d, 'fone'));
 
         $r1y = $y + self::H_ROW;
-        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, 'NOME / NOME EMPRESARIAL', $this->getTagValue($d, 'xNome'));
-        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, 'MUNICÍPIO / SIGLA UF',    $this->getMunicipioUF($d));
-        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($d));
+        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, self::LBL_NOME_EMPRESARIAL, $this->getTagValue($d, 'xNome'));
+        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, self::LBL_MUNICIPIO_UF,    $this->getMunicipioUF($d));
+        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, self::LBL_CODIGO_IBGE_CEP, $this->getCodigoIbgeCep($d));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($d));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, self::LBL_ENDERECO, $this->getEndereco($d));
         $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
         $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $this->getTagValue($d, 'email'));
 
@@ -555,17 +568,17 @@ class Danfse extends DaCommon
             $this->getTagValue($i, 'NIF')
         );
 
-        $this->drawField(self::X_C2, $y, self::W_C, self::H_ROW, 'CNPJ / CPF / NIF',           $cnpjCpfNif);
-        $this->drawField(self::X_C3, $y, self::W_C, self::H_ROW, 'INDICADOR MUNICIPAL (INSC.)', $this->getTagValue($i, 'IM'));
-        $this->drawField(self::X_C4, $y, self::W_C, self::H_ROW, 'TELEFONE',                    $this->getTagValue($i, 'fone'));
+        $this->drawField(self::X_C2, $y, self::W_C, self::H_ROW, self::LBL_CNPJ_CPF_NIF,    $cnpjCpfNif);
+        $this->drawField(self::X_C3, $y, self::W_C, self::H_ROW, self::LBL_INSC_MUN,        $this->getTagValue($i, 'IM'));
+        $this->drawField(self::X_C4, $y, self::W_C, self::H_ROW, 'TELEFONE',                 $this->getTagValue($i, 'fone'));
 
         $r1y = $y + self::H_ROW;
-        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, 'NOME / NOME EMPRESARIAL', $this->getTagValue($i, 'xNome'));
-        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, 'MUNICÍPIO / SIGLA UF',    $this->getMunicipioUF($i));
-        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, 'CÓDIGO IBGE / CEP',       $this->getCodigoIbgeCep($i));
+        $this->drawField(self::X_L,  $r1y, self::W_WIDE, self::H_ROW, self::LBL_NOME_EMPRESARIAL, $this->getTagValue($i, 'xNome'));
+        $this->drawField(self::X_C3, $r1y, self::W_C,    self::H_ROW, self::LBL_MUNICIPIO_UF,    $this->getMunicipioUF($i));
+        $this->drawField(self::X_C4, $r1y, self::W_C,    self::H_ROW, self::LBL_CODIGO_IBGE_CEP, $this->getCodigoIbgeCep($i));
 
         $r2y = $r1y + self::H_ROW;
-        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, 'Endereço', $this->getEndereco($i));
+        $this->drawField(self::X_L,  $r2y, self::W_WIDE, self::H_ROW, self::LBL_ENDERECO, $this->getEndereco($i));
         $this->drawField(self::X_C3, $r2y, self::W_C,    self::H_ROW, ' ',        ' ');
         $this->drawField(self::X_C4, $r2y, self::W_C,    self::H_ROW, 'E-mail',   $this->getTagValue($i, 'email'));
 
@@ -623,47 +636,56 @@ class Danfse extends DaCommon
             return $y + $this->hISSQN;
         }
 
-        $h       = $this->hISSQN;
+        $h        = $this->hISSQN;
         $tribNode = $this->valores ? $this->valores->getElementsByTagName('trib')->item(0) : null;
         $tribMun  = $tribNode ? $tribNode->getElementsByTagName('tribMun')->item(0) : null;
+        $v        = $this->getISSQNValues($tribMun);
 
         $this->drawBlocoHeader($y, self::H_ROW, 'TRIBUTAÇÃO MUNICIPAL (ISSQN)');
-        $tTrib  = $this->getTTribMunLabel($this->getTagValue($tribMun, 'tTribMun'));
-        $cMunFG = $this->getTagValue($tribMun, 'cMunFG') ?: '-';
-        $this->drawField(self::X_C2, $y, self::W_C,    self::H_ROW, 'TIPO DE TRIBUTAÇÃO DO ISSQN',         $tTrib);
-        $this->drawField(self::X_C3, $y, self::W_WIDE, self::H_ROW, 'MUN./UF/PAÍS DA INCIDÊNCIA DO ISSQN', $cMunFG);
+        $this->drawField(self::X_C2, $y, self::W_C,    self::H_ROW, 'TIPO DE TRIBUTAÇÃO DO ISSQN',         $v['tTrib']);
+        $this->drawField(self::X_C3, $y, self::W_WIDE, self::H_ROW, 'MUN./UF/PAÍS DA INCIDÊNCIA DO ISSQN', $v['cMunFG']);
 
-        $r1y    = $y + self::H_ROW;
-        $regEsp = $this->getTagValue($tribMun, 'regEspTrib')  ?: '-';
-        $tpImun = $this->getTagValue($tribMun, 'tpImunidade') ?: '-';
-        $tpSusp = $this->getTagValue($tribMun, 'tpSusp')      ?: '-';
-        $nProc  = $this->getTagValue($tribMun, 'nProcess')    ?: '-';
-        $this->drawField(self::X_L,  $r1y, self::W_C, self::H_ROW, 'Regime Especial de Tributação', $regEsp);
-        $this->drawField(self::X_C2, $r1y, self::W_C, self::H_ROW, 'Tipo de Imunidade',             $tpImun);
-        $this->drawField(self::X_C3, $r1y, self::W_C, self::H_ROW, 'Suspensão da Exigibilidade',    $tpSusp);
-        $this->drawField(self::X_C4, $r1y, self::W_C, self::H_ROW, 'Número Processo Suspensão',     $nProc);
+        $r1y = $y + self::H_ROW;
+        $this->drawField(self::X_L,  $r1y, self::W_C, self::H_ROW, 'Regime Especial de Tributação', $v['regEsp']);
+        $this->drawField(self::X_C2, $r1y, self::W_C, self::H_ROW, 'Tipo de Imunidade',             $v['tpImun']);
+        $this->drawField(self::X_C3, $r1y, self::W_C, self::H_ROW, 'Suspensão da Exigibilidade',    $v['tpSusp']);
+        $this->drawField(self::X_C4, $r1y, self::W_C, self::H_ROW, 'Número Processo Suspensão',     $v['nProc']);
 
-        $r2y  = $r1y + self::H_ROW;
-        $tpBM = $this->getTagValue($tribMun, 'tpBM')        ?: '-';
-        $vBM  = $this->getTagValue($tribMun, 'vCalcBM')     ?: ($this->getTagValue($tribMun, 'vRedBCM') ?: '-');
-        $vDed = $this->getTagValue($tribMun, 'vDR')         ?: ($this->getTagValue($tribMun, 'vCalcDR') ?: '-');
-        $vDI  = $this->getTagValue($tribMun, 'vDescIncond') ?: '-';
-        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'Benefício Municipal',    $tpBM);
-        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'Cálculo do BM',           $vBM);
-        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'Total Deduções/Reduções', $vDed);
-        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'Desconto Incondicionado', $vDI);
+        $r2y = $r1y + self::H_ROW;
+        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'Benefício Municipal',    $v['tpBM']);
+        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'Cálculo do BM',           $v['vBM']);
+        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'Total Deduções/Reduções', $v['vDed']);
+        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'Desconto Incondicionado', $v['vDI']);
 
-        $r3y    = $r2y + self::H_ROW;
-        $vBC    = $this->getTagValue($tribMun, 'vBC')        ?: '-';
-        $pAliq  = $this->getTagValue($tribMun, 'pAliqAplic') ?: '-';
-        $tpRet  = $this->getTpRetISSQNLabel($this->getTagValue($tribMun, 'tpRetISSQN'));
-        $vISSQN = $this->getTagValue($tribMun, 'vISSQN')     ?: '-';
-        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'BC ISSQN',          $vBC);
-        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA APLICADA', $pAliq);
-        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'RETENÇÃO DO ISSQN', $tpRet);
-        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'ISSQN APURADO',     $vISSQN);
+        $r3y = $r2y + self::H_ROW;
+        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'BC ISSQN',          $v['vBC']);
+        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA APLICADA', $v['pAliq']);
+        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'RETENÇÃO DO ISSQN', $v['tpRet']);
+        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'ISSQN APURADO',     $v['vISSQN']);
 
         return $y + $h;
+    }
+
+    private function getISSQNValues(?\DOMElement $tribMun): array
+    {
+        $vBMRaw  = $this->getTagValue($tribMun, 'vCalcBM') ?: $this->getTagValue($tribMun, 'vRedBCM');
+        $vDedRaw = $this->getTagValue($tribMun, 'vDR')     ?: $this->getTagValue($tribMun, 'vCalcDR');
+        return [
+            'tTrib'  => $this->getTTribMunLabel($this->getTagValue($tribMun, 'tTribMun')),
+            'cMunFG' => $this->getTagValue($tribMun, 'cMunFG')      ?: '-',
+            'regEsp' => $this->getTagValue($tribMun, 'regEspTrib')  ?: '-',
+            'tpImun' => $this->getTagValue($tribMun, 'tpImunidade') ?: '-',
+            'tpSusp' => $this->getTagValue($tribMun, 'tpSusp')      ?: '-',
+            'nProc'  => $this->getTagValue($tribMun, 'nProcess')    ?: '-',
+            'tpBM'   => $this->getTagValue($tribMun, 'tpBM')        ?: '-',
+            'vBM'    => $vBMRaw  ?: '-',
+            'vDed'   => $vDedRaw ?: '-',
+            'vDI'    => $this->getTagValue($tribMun, 'vDescIncond') ?: '-',
+            'vBC'    => $this->getTagValue($tribMun, 'vBC')         ?: '-',
+            'pAliq'  => $this->getTagValue($tribMun, 'pAliqAplic')  ?: '-',
+            'tpRet'  => $this->getTpRetISSQNLabel($this->getTagValue($tribMun, 'tpRetISSQN')),
+            'vISSQN' => $this->getTagValue($tribMun, 'vISSQN')      ?: '-',
+        ];
     }
 
     // ── Bloco 9: Tributação Federal ───────────────────────────────────────────
@@ -698,49 +720,54 @@ class Danfse extends DaCommon
         $h     = $this->hIBSCBS;
         $valEl = $this->ibscbs ? $this->ibscbs->getElementsByTagName('values')->item(0) : null;
         $trib  = $valEl ? $valEl->getElementsByTagName('trib')->item(0) : null;
-        $totCI = $this->totCIBS;
+        $v     = $this->getIBSCBSValues($trib);
 
         $this->drawBlocoHeader($y, self::H_ROW, 'TRIBUTAÇÃO IBS / CBS');
-        $cst    = ($this->getTagValue($trib, 'CST') ?: '-') . ' / ' . ($this->getTagValue($trib, 'cClassTrib') ?: '-');
-        $cIndOp = $this->getTagValue($trib, 'cIndOp')      ?: '-';
-        $cLocal = $this->getTagValue($trib, 'cLocalidade') ?: '-';
-        $indOp  = "{$cIndOp} / {$cLocal}";
-        $this->drawField(self::X_C2, $y, self::W_C,    self::H_ROW, 'CST / cClassTrib',                       $cst);
-        $this->drawField(self::X_C3, $y, self::W_WIDE, self::H_ROW, 'INDICADOR OP./CÓD. IBGE/MUN. INCID./UF', $indOp);
+        $this->drawField(self::X_C2, $y, self::W_C,    self::H_ROW, 'CST / cClassTrib',                       $v['cst']);
+        $this->drawField(self::X_C3, $y, self::W_WIDE, self::H_ROW, 'INDICADOR OP./CÓD. IBGE/MUN. INCID./UF', "{$v['cIndOp']} / {$v['cLocal']}");
 
-        $r1y   = $y + self::H_ROW;
-        $vExcl = $this->getTagValue($trib, 'vDescIncond')  ?: '0.00';
-        $vBC   = $this->getTagValue($trib, 'vBC')           ?: '-';
-        $pRed  = ($this->getTagValue($trib, 'pRedAliqIBS') ?: '0') . ' / '
-               . ($this->getTagValue($trib, 'pRedAliqCBS') ?: '0');
-        $pIBSUFMun = ($this->getTagValue($trib, 'pIBSUF') ?: '0') . ' / '
-                   . ($this->getTagValue($trib, 'pIBSMun') ?: '0');
-        $this->drawField(self::X_L,  $r1y, self::W_C, self::H_ROW, 'EXCLUSÕES E RED. DA BASE DE CÁLCULO', $vExcl);
-        $this->drawField(self::X_C2, $r1y, self::W_C, self::H_ROW, 'BASE CÁLCULO APÓS EXCL. E RED.',       $vBC);
-        $this->drawField(self::X_C3, $r1y, self::W_C, self::H_ROW, 'RED. ALÍQ. IBS / RED. ALÍQ. CBS',      $pRed);
-        $this->drawField(self::X_C4, $r1y, self::W_C, self::H_ROW, 'ALÍQUOTA IBS UF / IBS MUN',            $pIBSUFMun);
+        $r1y = $y + self::H_ROW;
+        $this->drawField(self::X_L,  $r1y, self::W_C, self::H_ROW, 'EXCLUSÕES E RED. DA BASE DE CÁLCULO', $v['vExcl']);
+        $this->drawField(self::X_C2, $r1y, self::W_C, self::H_ROW, 'BASE CÁLCULO APÓS EXCL. E RED.',       $v['vBC']);
+        $this->drawField(self::X_C3, $r1y, self::W_C, self::H_ROW, 'RED. ALÍQ. IBS / RED. ALÍQ. CBS',      "{$v['pRedIBS']} / {$v['pRedCBS']}");
+        $this->drawField(self::X_C4, $r1y, self::W_C, self::H_ROW, 'ALÍQUOTA IBS UF / IBS MUN',            "{$v['pIBSUF']} / {$v['pIBSMun']}");
 
-        $r2y     = $r1y + self::H_ROW;
-        $pEfMun  = $this->getTagValue($trib, 'pAliqEfetMun') ?: '0.00';
-        $vIBSMun = $this->getTagValue($trib, 'vIBSMun')      ?: '0.00';
-        $pEfUF   = $this->getTagValue($trib, 'pAliqEfetUF')  ?: '0.00';
-        $vIBSUF  = $this->getTagValue($trib, 'vIBSUF')       ?: '0.00';
-        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA MUNICIPAL - IBS', $pEfMun);
-        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO MUNICIPAL - IBS',  $vIBSMun);
-        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA ESTADUAL - IBS',  $pEfUF);
-        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO ESTADUAL - IBS',  $vIBSUF);
+        $r2y = $r1y + self::H_ROW;
+        $this->drawField(self::X_L,  $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA MUNICIPAL - IBS', $v['pEfMun']);
+        $this->drawField(self::X_C2, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO MUNICIPAL - IBS',  $v['vIBSMun']);
+        $this->drawField(self::X_C3, $r2y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA ESTADUAL - IBS',  $v['pEfUF']);
+        $this->drawField(self::X_C4, $r2y, self::W_C, self::H_ROW, 'VALOR APURADO ESTADUAL - IBS',  $v['vIBSUF']);
 
-        $r3y     = $r2y + self::H_ROW;
-        $vIBSTot = $this->getTagValue($trib, 'vIBSTot')      ?: '0.00';
-        $pCBS    = $this->getTagValue($trib, 'pCBS')          ?: '0.00';
-        $pEfCBS  = $this->getTagValue($trib, 'pAliqEfetCBS')  ?: '0.00';
-        $vCBS    = $this->getTagValue($trib, 'vCBS')           ?: '0.00';
-        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO - IBS', $vIBSTot);
-        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA - CBS',              $pCBS);
-        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA - CBS',         $pEfCBS);
-        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO - CBS',   $vCBS);
+        $r3y = $r2y + self::H_ROW;
+        $this->drawField(self::X_L,  $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO - IBS', $v['vIBSTot']);
+        $this->drawField(self::X_C2, $r3y, self::W_C, self::H_ROW, 'ALÍQUOTA - CBS',              $v['pCBS']);
+        $this->drawField(self::X_C3, $r3y, self::W_C, self::H_ROW, 'ALÍQ. EFETIVA - CBS',         $v['pEfCBS']);
+        $this->drawField(self::X_C4, $r3y, self::W_C, self::H_ROW, 'VALOR TOTAL APURADO - CBS',   $v['vCBS']);
 
         return $y + $h;
+    }
+
+    private function getIBSCBSValues(?\DOMElement $trib): array
+    {
+        return [
+            'cst'     => ($this->getTagValue($trib, 'CST') ?: '-') . ' / ' . ($this->getTagValue($trib, 'cClassTrib') ?: '-'),
+            'cIndOp'  => $this->getTagValue($trib, 'cIndOp')       ?: '-',
+            'cLocal'  => $this->getTagValue($trib, 'cLocalidade')  ?: '-',
+            'vExcl'   => $this->getTagValue($trib, 'vDescIncond')  ?: '0.00',
+            'vBC'     => $this->getTagValue($trib, 'vBC')           ?: '-',
+            'pRedIBS' => $this->getTagValue($trib, 'pRedAliqIBS')  ?: '0',
+            'pRedCBS' => $this->getTagValue($trib, 'pRedAliqCBS')  ?: '0',
+            'pIBSUF'  => $this->getTagValue($trib, 'pIBSUF')       ?: '0',
+            'pIBSMun' => $this->getTagValue($trib, 'pIBSMun')      ?: '0',
+            'pEfMun'  => $this->getTagValue($trib, 'pAliqEfetMun') ?: '0.00',
+            'vIBSMun' => $this->getTagValue($trib, 'vIBSMun')      ?: '0.00',
+            'pEfUF'   => $this->getTagValue($trib, 'pAliqEfetUF')  ?: '0.00',
+            'vIBSUF'  => $this->getTagValue($trib, 'vIBSUF')       ?: '0.00',
+            'vIBSTot' => $this->getTagValue($trib, 'vIBSTot')      ?: '0.00',
+            'pCBS'    => $this->getTagValue($trib, 'pCBS')          ?: '0.00',
+            'pEfCBS'  => $this->getTagValue($trib, 'pAliqEfetCBS') ?: '0.00',
+            'vCBS'    => $this->getTagValue($trib, 'vCBS')          ?: '0.00',
+        ];
     }
 
     // ── Bloco 11: Valor Total da NFS-e ────────────────────────────────────────
@@ -758,13 +785,16 @@ class Danfse extends DaCommon
 
         $ibsMunNode = $ci ? $ci->getElementsByTagName('totIBSMunTot')->item(0) : null;
         $cbsNode    = $ci ? $ci->getElementsByTagName('gCBS')->item(0) : null;
-        $vIBSTot    = $ibsMunNode ? ($this->getTagValue($ibsMunNode, 'vIBSTot') ?: '0.00') : '0.00';
-        $vCBSTot    = $cbsNode    ? ($this->getTagValue($cbsNode, 'vCBS') ?: '0.00') : '0.00';
+        $rawIBS      = $ibsMunNode ? $this->getTagValue($ibsMunNode, 'vIBSTot') : null;
+        $vIBSTot     = $rawIBS ?: '0.00';
+        $rawCBS      = $cbsNode ? $this->getTagValue($cbsNode, 'vCBS') : null;
+        $vCBSTot     = $rawCBS ?: '0.00';
         $totalIBSCBS = number_format(
             (float) str_replace(',', '.', $vIBSTot) + (float) str_replace(',', '.', $vCBSTot),
             2, '.', ''
         );
-        $vTotNF = $ci ? ($this->getTagValue($ci, 'vTotNF') ?: '-') : '-';
+        $rawVTotNF = $ci ? $this->getTagValue($ci, 'vTotNF') : null;
+        $vTotNF    = $rawVTotNF ?: '-';
 
         $this->drawBlocoHeader($y, self::H_ROW7, 'VALOR TOTAL DA NFS-E');
         $this->drawField(self::X_C2, $y, self::W_C, self::H_ROW7, 'VALOR DA OPERAÇÃO / SERVIÇO', $vServ);
@@ -917,36 +947,47 @@ class Danfse extends DaCommon
         return $dt ?: '-';
     }
 
+    private function resolveAddrNode(\DOMElement $el): ?\DOMElement
+    {
+        $addrNode = $el->getElementsByTagName('endNac')->item(0)
+                 ?: $el->getElementsByTagName('enderNac')->item(0);
+        if ($addrNode) {
+            return $addrNode;
+        }
+        $end = $el->getElementsByTagName('end')->item(0);
+        if (!$end) {
+            return null;
+        }
+        return $end->getElementsByTagName('endNac')->item(0)
+            ?: $end->getElementsByTagName('enderNac')->item(0);
+    }
+
     private function getMunicipioUF(?\DOMElement $el): string
     {
         if (empty($el)) {
             return '-';
         }
-        // Resolve the address node: endNac/enderNac directly under el, or end/endNac for toma
-        $addrNode = $el->getElementsByTagName('endNac')->item(0)
-                 ?: $el->getElementsByTagName('enderNac')->item(0);
-        if (!$addrNode) {
-            $end = $el->getElementsByTagName('end')->item(0);
-            $addrNode = $end
-                ? ($end->getElementsByTagName('endNac')->item(0) ?: $end->getElementsByTagName('enderNac')->item(0))
-                : null;
-        }
+        $addrNode = $this->resolveAddrNode($el);
         if ($addrNode) {
-            $xMun = $this->getTagValue($addrNode, 'xMun');
-            $uf   = $this->getTagValue($addrNode, 'UF');
-            $cMun = $this->getTagValue($addrNode, 'cMun');
-            if ($xMun && $uf) return "{$xMun} / {$uf}";
-            if ($xMun)        return $xMun;
-            if ($cMun && $uf) return "{$cMun} / {$uf}";
-            if ($uf)          return $uf;
-            if ($cMun)        return $cMun;
+            return $this->formatMunicipioUFFromAddr($addrNode);
         }
-        $endExt = $el->getElementsByTagName('endExt')->item(0);
-        if ($endExt) {
-            $xCidade = $this->getTagValue($endExt, 'xCidade');
-            $cPais   = $this->getTagValue($endExt, 'cPais');
-            return $xCidade && $cPais ? "{$xCidade} / {$cPais}" : ($xCidade ?: '-');
-        }
+        $endExt  = $el->getElementsByTagName('endExt')->item(0);
+        $xCidade = $endExt ? $this->getTagValue($endExt, 'xCidade') : null;
+        $cPais   = $endExt ? $this->getTagValue($endExt, 'cPais') : null;
+        $fallback = $xCidade ?: '-';
+        return $xCidade && $cPais ? "{$xCidade} / {$cPais}" : $fallback;
+    }
+
+    private function formatMunicipioUFFromAddr(\DOMElement $addrNode): string
+    {
+        $xMun = $this->getTagValue($addrNode, 'xMun');
+        $uf   = $this->getTagValue($addrNode, 'UF');
+        $cMun = $this->getTagValue($addrNode, 'cMun');
+        if ($xMun && $uf) { return "{$xMun} / {$uf}"; }
+        if ($xMun)        { return $xMun; }
+        if ($cMun && $uf) { return "{$cMun} / {$uf}"; }
+        if ($uf)          { return $uf; }
+        if ($cMun)        { return $cMun; }
         return '-';
     }
 
@@ -955,23 +996,23 @@ class Danfse extends DaCommon
         if (empty($el)) {
             return '-';
         }
-        $addrNode = $el->getElementsByTagName('endNac')->item(0)
-                 ?: $el->getElementsByTagName('enderNac')->item(0);
+        $addrNode = $this->resolveAddrNode($el);
         if (!$addrNode) {
-            $end = $el->getElementsByTagName('end')->item(0);
-            $addrNode = $end
-                ? ($end->getElementsByTagName('endNac')->item(0) ?: $end->getElementsByTagName('enderNac')->item(0))
-                : null;
+            return '-';
         }
-        if ($addrNode) {
-            $cMun = $this->getTagValue($addrNode, 'cMun');
-            $cep  = $this->getTagValue($addrNode, 'CEP');
-            if ($cMun || $cep) {
-                $cepFmt = $cep ? (string) preg_replace('/(\d{5})(\d{3})/', '$1-$2', $cep) : '';
-                return $cMun && $cepFmt ? "{$cMun} / {$cepFmt}" : ($cMun ?: $cepFmt ?: '-');
-            }
+        return $this->formatCodigoIbgeCep($addrNode);
+    }
+
+    private function formatCodigoIbgeCep(\DOMElement $addrNode): string
+    {
+        $cMun = $this->getTagValue($addrNode, 'cMun');
+        $cep  = $this->getTagValue($addrNode, 'CEP');
+        if (!$cMun && !$cep) {
+            return '-';
         }
-        return '-';
+        $cepFmt  = $cep ? (string) preg_replace('/(\d{5})(\d{3})/', '$1-$2', $cep) : '';
+        $fallback = $cMun ?: ($cepFmt ?: '-');
+        return $cMun && $cepFmt ? "{$cMun} / {$cepFmt}" : $fallback;
     }
 
     private function toTitleCase(string $text): string
