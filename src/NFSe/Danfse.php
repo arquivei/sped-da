@@ -980,15 +980,14 @@ class Danfse extends DaCommon
 
     private function formatMunicipioUFFromAddr(\DOMElement $addrNode): string
     {
-        $xMun = $this->getTagValue($addrNode, 'xMun');
-        $uf   = $this->getTagValue($addrNode, 'UF');
-        $cMun = $this->getTagValue($addrNode, 'cMun');
-        if ($xMun && $uf) { return "{$xMun} / {$uf}"; }
-        if ($xMun)        { return $xMun; }
-        if ($cMun && $uf) { return "{$cMun} / {$uf}"; }
-        if ($uf)          { return $uf; }
-        if ($cMun)        { return $cMun; }
-        return '-';
+        $xMun   = $this->getTagValue($addrNode, 'xMun');
+        $uf     = $this->getTagValue($addrNode, 'UF');
+        $cMun   = $this->getTagValue($addrNode, 'cMun');
+        $cidade = $xMun ?: $cMun;
+        if ($cidade && $uf) {
+            return "{$cidade} / {$uf}";
+        }
+        return $cidade ?: ($uf ?: '-');
     }
 
     private function getCodigoIbgeCep(?\DOMElement $el): string
