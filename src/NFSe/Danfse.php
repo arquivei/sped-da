@@ -9,15 +9,15 @@ use Com\Tecnick\Barcode\Barcode;
 
 class Danfse extends DaCommon
 {
-    // Coordinate constants (mm, from spec NT-008 section 2.4.5)
+    // Constantes de coordenadas (mm, conforme especificação NT-008 seção 2.4.5)
     private const X_L   =   2.0;
     private const X_C2  =  53.5;
     private const X_C3  = 105.0;
     private const X_C4  = 156.5;
     private const X_QR  = 174.0;
     private const X_QR2 = 156.5;
-    private const X_DIV =   4.0;  // X_L + 2mm inset
-    private const W_DIV = 202.0;  // W_FULL - 4mm (2mm each side)
+    private const X_DIV =   4.0;  // X_L + 2mm de margem interna
+    private const W_DIV = 202.0;  // W_FULL - 4mm (2mm de cada lado)
 
     private const W_FULL = 206.0;
     private const W_C1   =  51.5;
@@ -142,22 +142,22 @@ class Danfse extends DaCommon
         $this->pdf->SetLineWidth(0.18);
 
         $y = (float) $this->margsup;
-        $y = $this->bloco1Cabecalho($y);
-        $y = $this->bloco2DadosNfse($y);
-        $y = $this->bloco3Prestador($y);
-        $y = $this->bloco4Tomador($y);
-        $y = $this->bloco5Destinatario($y);
-        $y = $this->bloco6Intermediario($y);
-        $y = $this->bloco7Servico($y);
-        $y = $this->bloco8ISSQN($y);
+        $y = $this->blocoCabecalho($y);
+        $y = $this->blocoDadosNfse($y);
+        $y = $this->blocoPrestador($y);
+        $y = $this->blocoTomador($y);
+        $y = $this->blocoDestinatario($y);
+        $y = $this->blocoIntermediario($y);
+        $y = $this->blocoServico($y);
+        $y = $this->blocoISSQN($y);
         if ($this->hTribFederal > 0) {
-            $y = $this->bloco9TribFederal($y);
+            $y = $this->blocoTribFederal($y);
         }
-        $y = $this->bloco10IBSCBS($y);
-        $y = $this->bloco11ValorTotal($y);
-        $y = $this->bloco12InfoCompl($y);
+        $y = $this->blocoIBSCBS($y);
+        $y = $this->blocoValorTotal($y);
+        $y = $this->blocoInfoCompl($y);
         if ($this->hCanhoto > 0) {
-            $this->bloco13Canhoto($y);
+            $this->blocoCanhoto($y);
         }
 
         $this->watermark();
@@ -247,7 +247,7 @@ class Danfse extends DaCommon
             $nLines = 1;
         }
 
-        // label area (3.2mm) + nLines × lineH + bottom padding (0.4mm)
+        // área do label (3.2mm) + nLinhas × lineH + padding inferior (0.4mm)
         $descH = max(self::H_ROW, $nLines * $lineH + 3.6);
         $this->hServico = self::H_ROW + self::H_COD_SERV + $descH;
     }
@@ -294,7 +294,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 1: Cabeçalho ────────────────────────────────────────────────────
-    private function bloco1Cabecalho(float $y): float
+    private function blocoCabecalho(float $y): float
     {
         $h = $this->hCabecalho;
 
@@ -367,7 +367,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 2: Dados NFS-e + QR Code ───────────────────────────────────────
-    private function bloco2DadosNfse(float $y): float
+    private function blocoDadosNfse(float $y): float
     {
         $h = $this->hDadosNfse;
 
@@ -389,30 +389,30 @@ class Danfse extends DaCommon
         $qrY    = $y + 3.7;
         $qrSize = self::W_QR;
 
-        // Row 0: Chave de acesso (full width)
+        // Linha 0: Chave de acesso (largura total)
         $r0h = self::H_ROW7;
         $this->drawField(self::X_L, $y, self::W_FULL, $r0h, 'CHAVE DE ACESSO DA NFS-E', $chave, false, self::F_CAMPO_ID);
 
         $r1y = $y + $r0h;
 
-        // Row 1: Número | Competência | Data/Hora (3 colunas iguais + área QR)
+        // Linha 1: Número | Competência | Data/Hora (3 colunas iguais + área QR)
         $this->drawField(self::X_L,  $r1y, self::W_C1, self::H_ROW7, 'NÚMERO DA NFS-E',               $nNFSe,   false, self::F_CAMPO_ID);
         $this->drawField(self::X_C2, $r1y, self::W_C,  self::H_ROW7, 'COMPETÊNCIA DA NFS-E',           $dCompet, false, self::F_CAMPO_ID);
         $this->drawField(self::X_C3, $r1y, self::W_C,  self::H_ROW7, 'DATA E HORA DA EMISSÃO DA NFS-E', $dhProc,  false, self::F_CAMPO_ID);
 
-        // Row 2: Número DPS | Série | Data/Hora DPS
+        // Linha 2: Número DPS | Série | Data/Hora DPS
         $r2y = $r1y + self::H_ROW7;
         $this->drawField(self::X_L,  $r2y, self::W_C1, self::H_ROW7, 'NÚMERO DO DPS',                 $nDPS,  false, self::F_CAMPO_ID);
         $this->drawField(self::X_C2, $r2y, self::W_C,  self::H_ROW7, 'SÉRIE DA DPS',                  $serie, false, self::F_CAMPO_ID);
         $this->drawField(self::X_C3, $r2y, self::W_C,  self::H_ROW7, 'DATA E HORA DA EMISSÃO DA DPS', $dhEmi, false, self::F_CAMPO_ID);
 
-        // Row 3: Emitente (cinza obrigatório per NT-008 §2.2.3) | Situação | Finalidade
+        // Linha 3: Emitente (cinza obrigatório conforme NT-008 §2.2.3) | Situação | Finalidade
         $r3y = $r2y + self::H_ROW7;
         $this->drawField(self::X_L,  $r3y, self::W_C1, self::H_ROW7, 'EMITENTE DA NFS-E', $tpEmit, true,  self::F_CAMPO_ID);
         $this->drawField(self::X_C2, $r3y, self::W_C,  self::H_ROW7, 'SITUAÇÃO DA NFS-E', $cStat,  false, self::F_CAMPO_ID);
         $this->drawField(self::X_C3, $r3y, self::W_C,  self::H_ROW7, 'FINALIDADE',         $finNFSe, false, self::F_CAMPO_ID);
 
-        // QR code area spans rows 1-3
+        // Área do QR Code abrange as linhas 1 a 3
         $this->drawQrCode($qrX + 0.5, $qrY, $qrSize, $qrUrl);
 
         $qrComplX = self::X_QR2;
@@ -428,7 +428,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 3: Prestador/Fornecedor ─────────────────────────────────────────
-    private function bloco3Prestador(float $y): float
+    private function blocoPrestador(float $y): float
     {
         $h = $this->hPrestador;
         $p = $this->prest;
@@ -471,7 +471,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 4: Tomador/Adquirente ───────────────────────────────────────────
-    private function bloco4Tomador(float $y): float
+    private function blocoTomador(float $y): float
     {
         if (!$this->hasTomador) {
             $this->drawSuppressedBlock($y, $this->hTomador,
@@ -508,7 +508,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 5: Destinatário da Operação ─────────────────────────────────────
-    private function bloco5Destinatario(float $y): float
+    private function blocoDestinatario(float $y): float
     {
         if ($this->destEhTomador) {
             $this->drawSuppressedBlock($y, $this->hDestinatario,
@@ -549,7 +549,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 6: Intermediário da Operação ────────────────────────────────────
-    private function bloco6Intermediario(float $y): float
+    private function blocoIntermediario(float $y): float
     {
         if (!$this->hasIntermediario) {
             $this->drawSuppressedBlock($y, $this->hIntermediario,
@@ -586,7 +586,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 7: Serviço Prestado ─────────────────────────────────────────────
-    private function bloco7Servico(float $y): float
+    private function blocoServico(float $y): float
     {
         $h    = $this->hServico;
         $s    = $this->serv;
@@ -628,7 +628,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 8: Tributação Municipal (ISSQN) ─────────────────────────────────
-    private function bloco8ISSQN(float $y): float
+    private function blocoISSQN(float $y): float
     {
         if (!$this->hasISSQN) {
             $this->drawSuppressedBlock($y, $this->hISSQN,
@@ -689,7 +689,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 9: Tributação Federal ───────────────────────────────────────────
-    private function bloco9TribFederal(float $y): float
+    private function blocoTribFederal(float $y): float
     {
         $h        = $this->hTribFederal;
         $tribNode = $this->valores ? $this->valores->getElementsByTagName('trib')->item(0) : null;
@@ -715,7 +715,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 10: Tributação IBS/CBS ──────────────────────────────────────────
-    private function bloco10IBSCBS(float $y): float
+    private function blocoIBSCBS(float $y): float
     {
         $h     = $this->hIBSCBS;
         $valEl = $this->ibscbs ? $this->ibscbs->getElementsByTagName('values')->item(0) : null;
@@ -771,7 +771,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 11: Valor Total da NFS-e ────────────────────────────────────────
-    private function bloco11ValorTotal(float $y): float
+    private function blocoValorTotal(float $y): float
     {
         $h  = $this->hValorTotal;
         $v  = $this->valores;
@@ -811,7 +811,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 12: Informações Complementares ──────────────────────────────────
-    private function bloco12InfoCompl(float $y): float
+    private function blocoInfoCompl(float $y): float
     {
         $h  = $this->hInfoCompl;
         $ic = $this->infDPS
@@ -835,7 +835,7 @@ class Danfse extends DaCommon
     }
 
     // ── Bloco 13: Canhoto (opcional) ──────────────────────────────────────────
-    private function bloco13Canhoto(float $y): float
+    private function blocoCanhoto(float $y): float
     {
         $h = $this->hCanhoto;
 
@@ -853,7 +853,7 @@ class Danfse extends DaCommon
         return $y + $h;
     }
 
-    // ── Watermarks ────────────────────────────────────────────────────────────
+    // ── Marcas d'água ─────────────────────────────────────────────────────────
     private function watermark(): void
     {
         $cStat = $this->getTagValue($this->infNFSe, 'cStat');
@@ -881,7 +881,7 @@ class Danfse extends DaCommon
         $this->pdf->SetTextColor(0, 0, 0);
     }
 
-    // ── Drawing helpers ───────────────────────────────────────────────────────
+    // ── Auxiliares de desenho ─────────────────────────────────────────────────
 
     private function drawBlocoHeader(float $y, float $h, string $label): void
     {
@@ -1030,7 +1030,7 @@ class Danfse extends DaCommon
         if (empty($el)) {
             return '';
         }
-        // Case 1: endNac/enderNac directly under el and xLgr is inside it (standard or emit structure)
+        // Caso 1: endNac/enderNac diretamente sob el e xLgr dentro dele (estrutura padrão ou emit)
         $addrNode = $el->getElementsByTagName('endNac')->item(0)
                  ?: $el->getElementsByTagName('enderNac')->item(0);
         if ($addrNode && $this->getTagValue($addrNode, 'xLgr')) {
@@ -1042,7 +1042,7 @@ class Danfse extends DaCommon
             ]);
             return implode(', ', $parts) ?: '';
         }
-        // Case 2: <end> wrapper with xLgr as direct child (toma structure in real NFSe XMLs)
+        // Caso 2: wrapper <end> com xLgr como filho direto (estrutura toma em XMLs reais de NFS-e)
         $end = $el->getElementsByTagName('end')->item(0);
         if ($end) {
             $parts = array_filter([
@@ -1055,7 +1055,7 @@ class Danfse extends DaCommon
                 return implode(', ', $parts);
             }
         }
-        // Case 3: xLgr as direct child of el (fallback)
+        // Caso 3: xLgr como filho direto de el (fallback)
         $parts = array_filter([
             $this->getTagValue($el, 'xLgr'),
             $this->getTagValue($el, 'nro'),
