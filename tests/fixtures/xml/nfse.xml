@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFSe>
+  <infNFSe Id="NFSe25060000100000000001000000000100000000012345678900">
+    <xLocEmi>3550308</xLocEmi>
+    <UF>SP</UF>
+    <ambGer>Sistema ERP Empresa XYZ</ambGer>
+    <dhProc>2025-06-05T10:30:00</dhProc>
+    <cStat>1</cStat>
+    <nNFSe>1234</nNFSe>
+    <DPS>
+      <infDPS>
+        <tpAmb>1</tpAmb>
+        <dCompet>2025-06</dCompet>
+        <nDPS>100</nDPS>
+        <serie>A</serie>
+        <dhEmi>2025-06-05T09:00:00</dhEmi>
+        <tpEmit>1</tpEmit>
+        <finNFSe>1</finNFSe>
+        <prest>
+          <CNPJ>12345678000195</CNPJ>
+          <IM>12345</IM>
+          <fone>1199999999</fone>
+          <xNome>Empresa Prestadora de Servicos LTDA</xNome>
+          <endNac>
+            <cMun>3550308</cMun>
+            <xMun>Sao Paulo</xMun>
+            <CEP>01310100</CEP>
+            <UF>SP</UF>
+            <xLgr>Av. Paulista</xLgr>
+            <nro>1000</nro>
+            <xBairro>Bela Vista</xBairro>
+          </endNac>
+          <email>contato@prestador.com.br</email>
+          <regTrib>
+            <opSimpNac>1</opSimpNac>
+          </regTrib>
+        </prest>
+        <toma>
+          <CNPJ>98765432000100</CNPJ>
+          <IM>54321</IM>
+          <fone>1188888888</fone>
+          <xNome>Empresa Tomadora LTDA</xNome>
+          <endNac>
+            <cMun>3550308</cMun>
+            <xMun>Sao Paulo</xMun>
+            <CEP>04538133</CEP>
+            <UF>SP</UF>
+            <xLgr>Rua das Flores</xLgr>
+            <nro>50</nro>
+            <xBairro>Itaim Bibi</xBairro>
+          </endNac>
+          <email>financeiro@tomador.com.br</email>
+        </toma>
+        <serv>
+          <cServ>
+            <cTribNac>01.01.00</cTribNac>
+            <cTribMun>010101</cTribMun>
+            <xDescServ>Analise e desenvolvimento de sistemas de informacao</xDescServ>
+          </cServ>
+          <cNBS>1.0107.00.00</cNBS>
+          <locPres>
+            <cLocPres>3550308</cLocPres>
+          </locPres>
+          <xDescServ>Desenvolvimento de sistema de gestao empresarial conforme contrato no 001/2025, incluindo analise de requisitos, modelagem de dados e testes de integracao.</xDescServ>
+        </serv>
+        <valores>
+          <vServ>10000.00</vServ>
+          <vDescIncond>500.00</vDescIncond>
+          <vDescCond>0.00</vDescCond>
+          <trib>
+            <tribMun>
+              <tTribMun>1</tTribMun>
+              <cMunFG>3550308</cMunFG>
+              <pAliqAplic>3.0000</pAliqAplic>
+              <tpRetISSQN>1</tpRetISSQN>
+              <vBC>9500.00</vBC>
+              <vISSQN>285.00</vISSQN>
+            </tribMun>
+            <tribFed>
+              <vRetIRRF>150.00</vRetIRRF>
+              <vRetCP>110.00</vRetCP>
+              <vRetCSLL>95.00</vRetCSLL>
+            </tribFed>
+          </trib>
+          <vTotalRet>355.00</vTotalRet>
+          <vLiq>9145.00</vLiq>
+        </valores>
+        <infoCompl>
+          <xInfComp>Contrato no 001/2025. Totais Aproximados dos Tributos cfe. Lei no 12.741/2012: Federais: R$ 355,00; Estaduais: R$ 0,00; Municipais: R$ 285,00.</xInfComp>
+        </infoCompl>
+        <IBSCBS>
+          <values>
+            <trib>
+              <CST>010</CST>
+              <cClassTrib>010001</cClassTrib>
+              <cIndOp>1</cIndOp>
+              <cLocalidade>3550308</cLocalidade>
+              <vBC>9500.00</vBC>
+              <pRedAliqIBS>0.0000</pRedAliqIBS>
+              <pRedAliqCBS>0.0000</pRedAliqCBS>
+              <pIBSUF>0.0000</pIBSUF>
+              <pIBSMun>0.0000</pIBSMun>
+              <pAliqEfetMun>0.0000</pAliqEfetMun>
+              <vIBSMun>0.00</vIBSMun>
+              <pAliqEfetUF>0.0000</pAliqEfetUF>
+              <vIBSUF>0.00</vIBSUF>
+              <vIBSTot>0.00</vIBSTot>
+              <pCBS>0.0000</pCBS>
+              <pAliqEfetCBS>0.0000</pAliqEfetCBS>
+              <vCBS>0.00</vCBS>
+            </trib>
+          </values>
+        </IBSCBS>
+      </infDPS>
+    </DPS>
+    <totCIBS>
+      <gIBS>
+        <totIBSMunTot>
+          <vIBSTot>0.00</vIBSTot>
+        </totIBSMunTot>
+      </gIBS>
+      <gCBS>
+        <vCBS>0.00</vCBS>
+      </gCBS>
+      <vTotNF>9145.00</vTotNF>
+    </totCIBS>
+  </infNFSe>
+</NFSe>
