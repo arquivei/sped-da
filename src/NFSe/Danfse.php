@@ -372,10 +372,10 @@ class Danfse extends DaCommon
         $h = $this->hDadosNfse;
 
         $chaveRaw = $this->infNFSe->getAttribute('Id');
-        $chave    = (string) preg_replace('/^NFSe/', '', $chaveRaw);
+        $chave    = (string) preg_replace('/^NFS/', '', $chaveRaw);
 
         $nNFSe   = $this->getTagValue($this->infNFSe, 'nNFSe') ?: '-';
-        $dCompet = $this->getTagValue($this->infDPS,  'dCompet') ?: '-';
+        $dCompet = $this->formatDate($this->getTagValue($this->infDPS, 'dCompet'));
         $dhProc  = $this->formatDatetime($this->getTagValue($this->infNFSe, 'dhProc'));
         $nDPS    = $this->getTagValue($this->infDPS,  'nDPS') ?: '-';
         $serie   = $this->getTagValue($this->infDPS,  'serie') ?: '-';
@@ -463,7 +463,7 @@ class Danfse extends DaCommon
         $r3y     = $r2y + self::H_ROW;
         $regTrib = $p ? $p->getElementsByTagName('regTrib')->item(0) : null;
         $simpNac = $this->getOpSimpNacLabel($this->getTagValue($regTrib, 'opSimpNac'));
-        $regApTrib = $this->getTagValue($regTrib, 'regApTribSN') ?: '-';
+        $regApTrib = $this->getRegApTribSNLabel($this->getTagValue($regTrib, 'regApTribSN'));
         $this->drawField(self::X_L,  $r3y, self::W_WIDE, self::H_ROW, 'SIMPLES NACIONAL NA DATA DA COMPETÊNCIA', $simpNac);
         $this->drawField(self::X_C3, $r3y, self::W_WIDE, self::H_ROW, 'REGIME DE APURAÇÃO TRIBUTÁRIA PELO SN',   $regApTrib);
 
@@ -750,7 +750,9 @@ class Danfse extends DaCommon
     private function getIBSCBSValues(?\DOMElement $trib): array
     {
         return [
-            'cst'     => ($this->getTagValue($trib, 'CST') ?: '-') . ' / ' . ($this->getTagValue($trib, 'cClassTrib') ?: '-'),
+            'cst'     => ($this->getTagValue($trib, 'CST') || $this->getTagValue($trib, 'cClassTrib'))
+                ? ($this->getTagValue($trib, 'CST') ?: '-') . ' / ' . ($this->getTagValue($trib, 'cClassTrib') ?: '-')
+                : '-',
             'cIndOp'  => $this->getTagValue($trib, 'cIndOp')       ?: '-',
             'cLocal'  => $this->getTagValue($trib, 'cLocalidade')  ?: '-',
             'vExcl'   => $this->getTagValue($trib, 'vDescIncond')  ?: '0.00',
@@ -939,6 +941,14 @@ class Danfse extends DaCommon
         return !empty($nif) ? $nif : '-';
     }
 
+    private function formatDate(string $date): string
+    {
+        if (preg_match('/^(\d{4})-(\d{2})$/', $date, $m)) {
+            return "01/{$m[2]}/{$m[1]}";
+        }
+        return $date ?: '-';
+    }
+
     private function formatDatetime(string $dt): string
     {
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})/', $dt, $m)) {
@@ -1077,10 +1087,10 @@ class Danfse extends DaCommon
     private function getCStatLabel(string $code): string
     {
         $map = [
-            '1'  => 'NFS-e Autorizada',
-            '2'  => 'NFS-e Cancelada',
-            '3'  => 'NFS-e Substituída',
-            '99' => 'NFS-e de Decisão Judicial ou Administ...',
+            '100' => 'NFS-e Gerada',
+            '101' => 'NFS-e de Substituição Gerada',
+            '102' => 'NFS-e de Decisão Judicial',
+            '103' => 'NFS-e Avulsa',
         ];
         return $map[$code] ?? $code;
     }
@@ -1094,6 +1104,17 @@ class Danfse extends DaCommon
             '4'     => 'NFS-e substituta',
             default => $code,
         };
+    }
+
+    private function getRegApTribSNLabel(string $code): string
+    {
+        $label = match ($code) {
+            '1'     => 'Regime de apuração dos tributos federais e municipal pelo SN',
+            '2'     => 'Regime de apuração dos tributos federais pelo SN e o ISSQN pela NFS-e conforme respectiva legislação municipal do tributo',
+            '3'     => 'Regime de apuração dos tributos federais e municipal pela NFS-e conforme respectivas legilações federal e municipal de cada tributo',
+            default => $code ?: '-',
+        };
+        return mb_strlen($label) > 77 ? mb_substr($label, 0, 74) . '...' : $label;
     }
 
     private function getOpSimpNacLabel(string $code): string
