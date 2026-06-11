@@ -185,7 +185,8 @@ class Danfse extends DaCommon
         $tribMun        = $this->valores
             ? $this->valores->getElementsByTagName('tribMun')->item(0)
             : null;
-        $this->hasISSQN = !empty($tribMun);
+        $tpRetISSQN     = $tribMun ? $this->getTagValue($tribMun, 'tpRetISSQN') : null;
+        $this->hasISSQN = !empty($tribMun) && $tpRetISSQN !== '1';
 
         $dCompet = $this->getTagValue($this->infDPS, 'dCompet');
         if (!empty($dCompet)) {
