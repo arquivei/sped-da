@@ -994,14 +994,25 @@ class Danfse extends DaCommon
 
     private function formatMunicipioUFFromAddr(\DOMElement $addrNode): string
     {
-        $xMun   = $this->getTagValue($addrNode, 'xMun');
-        $uf     = $this->getTagValue($addrNode, 'UF');
-        $cMun   = $this->getTagValue($addrNode, 'cMun');
-        $cidade = $xMun ?: $cMun;
-        if ($cidade && $uf) {
-            return "{$cidade} / {$uf}";
+        $xMun              = $this->getTagValue($addrNode, 'xMun');
+        $uf                = $this->getTagValue($addrNode, 'UF');
+        $cMun              = $this->getTagValue($addrNode, 'cMun');
+        [$nomeIbge, $ufIbge] = $this->lookupMunicipio($cMun);
+        $nome = $xMun ?: $nomeIbge;
+        $uf   = $uf   ?: $ufIbge;
+        if ($nome && $uf) {
+            return "{$nome} / {$uf}";
         }
-        return $cidade ?: ($uf ?: '-');
+        return $nome ?: ($uf ?: '-');
+    }
+
+    private function lookupMunicipio(string $cMun): array
+    {
+        static $municipios = null;
+        if ($municipios === null) {
+            $municipios = require __DIR__ . '/ibge-municipios.php';
+        }
+        return $municipios[$cMun] ?? [$cMun, ''];
     }
 
     private function getCodigoIbgeCep(?\DOMElement $el): string
