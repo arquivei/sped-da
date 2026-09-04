@@ -949,13 +949,13 @@ class Danfse extends DaCommon
     private function ibsExclusoes(?DOMElement $valores)
     {
         $dpsValores = $this->childNode('valores', $this->infDPS);
-        $ajusteBC = $this->childNode('vAjusteBC', $dpsValores);
 
-        // NT-009 secao 2.3: vDedRed e gReeRepRes foram unificados em vAjusteBC.
-        // O fallback para vCalcReeRepRes atende XMLs emitidos antes da mudanca.
-        $ajuste = $ajusteBC
-            ? $this->value('vAjusteBCISSQN', $ajusteBC)
-            : $this->value('vCalcReeRepRes', $valores);
+        // NT-009 secao 2.3: vCalcReeRepRes foi RENOMEADO para vCalcAjusteBCIBSCBS,
+        // no mesmo caminho infNFSe/IBSCBS/valores/. O fallback atende XMLs emitidos
+        // antes da mudanca. O vAjusteBCISSQN e do escopo ISSQN e nao entra nesta
+        // base de calculo, que e a do IBS/CBS.
+        $ajuste = $this->value('vCalcAjusteBCIBSCBS', $valores)
+            ?: $this->value('vCalcReeRepRes', $valores);
 
         return $this->sumValues([
             $this->value('vDescIncond', $dpsValores),
