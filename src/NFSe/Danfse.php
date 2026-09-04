@@ -1162,7 +1162,11 @@ class Danfse extends DaCommon
 
     private function finalidade($value)
     {
-        $map = ['1' => 'NFS-e regular', '2' => 'NFS-e de substituição', '3' => 'NFS-e de ajuste'];
+        $map = [
+            '0' => 'NFS-e regular',
+            '1' => 'NFS-e de crédito',
+            '2' => 'NFS-e de débito',
+        ];
         return isset($map[$value]) ? $map[$value] : $this->dash($value);
     }
 
