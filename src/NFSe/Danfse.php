@@ -53,7 +53,7 @@ class Danfse extends DaCommon
     private $infDPS;
 
     /** @var bool */
-    private $printCanhoto = true;
+    private $printCanhoto = false;
 
     /** @var bool */
     private $printCanhotoCutLine = false;
@@ -93,6 +93,12 @@ class Danfse extends DaCommon
         $this->printCanhoto = (bool) $flag;
     }
 
+    /** @deprecated Use setPrintCanhoto(). Mantido para compatibilidade com a API anterior do fork. */
+    public function setCanhoto($show = true)
+    {
+        $this->setPrintCanhoto($show);
+    }
+
     public function setPrintCanhotoCutLine($flag = true)
     {
         $this->printCanhotoCutLine = (bool) $flag;
@@ -115,7 +121,8 @@ class Danfse extends DaCommon
 
     public function creditsIntegratorFooter($message = '', $powered = true)
     {
-        parent::creditsIntegratorFooter($message, $powered);
+        parent::creditsIntegratorFooter($message);
+        $this->powered = $powered;
         $this->printFooter = true;
     }
 
