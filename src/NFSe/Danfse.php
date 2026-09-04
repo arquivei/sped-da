@@ -511,12 +511,34 @@ class Danfse extends DaCommon
         $this->drawSectionTitle('TRIBUTAÇÃO FEDERAL (EXCETO CBS)', self::X, $y, self::CELL, self::ROW);
         $this->drawMoneyField('IRRF', $this->value('vRetIRRF', $tribFed), self::COL2, $y, self::CELL, self::ROW);
         $this->drawMoneyField('Contribuição Previdenciária - Retida', $this->value('vRetCP', $tribFed), self::COL3, $y, self::CELL, self::ROW);
-        $this->drawMoneyField('Contribuições Sociais - Retidas', $this->value('vRetCSLL', $tribFed), self::COL4, $y, self::CELL, self::ROW);
-        $this->drawMoneyField('PIS - Débito Apuração Própria', $this->value('vPis', $pisCofins), self::X, $y + 6.5, self::CELL, self::ROW);
-        $this->drawMoneyField('COFINS - Débito Apuração Própria', $this->value('vCofins', $pisCofins), self::COL2, $y + 6.5, self::CELL, self::ROW);
+        $retencao = $this->retencaoPisCofins($tribFed, $pisCofins);
+        $this->drawMoneyField('Contribuições Sociais - Retidas', $retencao['vRetCSLL'], self::COL4, $y, self::CELL, self::ROW);
+        $this->drawMoneyField('PIS - Débito Apuração Própria', $retencao['vPis'], self::X, $y + 6.5, self::CELL, self::ROW);
+        $this->drawMoneyField('COFINS - Débito Apuração Própria', $retencao['vCofins'], self::COL2, $y + 6.5, self::CELL, self::ROW);
         $this->drawField('Descrição Contrib. Sociais - Retidas', $this->tpRetPisCofins($this->value('tpRetPisCofins', $pisCofins)), self::COL3, $y + 6.5, self::CELL2, self::ROW);
 
         return $y + 13.0;
+    }
+
+    /**
+     * NT-008 v1.02: quando tpRetPisCofins = 1 (PIS/COFINS Retido), vPis e vCofins
+     * retornam 0,00 e as Contribuicoes Sociais Retidas somam vRetCSLL + vPis + vCofins.
+     */
+    private function retencaoPisCofins(?DOMElement $tribFed, ?DOMElement $pisCofins)
+    {
+        $vPis = $this->value('vPis', $pisCofins);
+        $vCofins = $this->value('vCofins', $pisCofins);
+        $vRetCSLL = $this->value('vRetCSLL', $tribFed);
+
+        if ($this->value('tpRetPisCofins', $pisCofins) !== '1') {
+            return ['vPis' => $vPis, 'vCofins' => $vCofins, 'vRetCSLL' => $vRetCSLL];
+        }
+
+        return [
+            'vPis' => '0.00',
+            'vCofins' => '0.00',
+            'vRetCSLL' => $this->sumValues([$vRetCSLL, $vPis, $vCofins]),
+        ];
     }
 
     private function drawIbsCbs($y)
