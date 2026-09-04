@@ -845,10 +845,25 @@ class Danfse extends DaCommon
         $nac = $this->firstNode('endNac', $end) ?: $this->firstNode('enderNac', $end);
         $ext = $this->firstNode('endExt', $end);
         $base = $nac ?: $ext;
-        return $this->dash($this->joinNonEmpty([
-            $this->firstValue(['xMun', 'xCidade', 'cMun'], $base),
-            $this->value('UF', $base)
-        ], ' / '));
+
+        $nome = $this->firstValue(['xMun', 'xCidade'], $base);
+        $uf = $this->value('UF', $base);
+
+        if ($nome === '' || $nome === null) {
+            [$nome, $ufIbge] = $this->lookupMunicipio((string) $this->value('cMun', $base));
+            $uf = $uf ?: $ufIbge;
+        }
+
+        return $this->dash($this->joinNonEmpty([$nome, $uf], ' / '));
+    }
+
+    private function lookupMunicipio(string $cMun): array
+    {
+        static $municipios = null;
+        if ($municipios === null) {
+            $municipios = require __DIR__ . '/ibge-municipios.php';
+        }
+        return $municipios[$cMun] ?? [$cMun, ''];
     }
 
     private function ibgeCep(?DOMElement $end)
