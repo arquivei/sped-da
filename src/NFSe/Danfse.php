@@ -457,7 +457,10 @@ class Danfse extends DaCommon
         $serv = $this->childNode('serv', $this->infDPS);
         $cServ = $this->childNode('cServ', $serv);
         $loc = $this->childNode('locPrest', $serv);
-        $codigos = $this->joinNonEmpty([$this->value('cTribNac', $cServ), $this->value('cTribMun', $cServ)], ' / ');
+        $codigos = $this->joinNonEmpty([
+            $this->formatTribNac($this->value('cTribNac', $cServ)),
+            $this->value('cTribMun', $cServ)
+        ], ' / ');
         $descCodigo = $this->value('xTribMun', $cServ);
         if (empty($descCodigo)) {
             $descCodigo = $this->value('xTribNac', $cServ);
@@ -920,18 +923,50 @@ class Danfse extends DaCommon
 
     private function localPrestacao(?DOMElement $loc)
     {
+        // NT-008 secao 2.4.5: o nome do municipio vem de NFSe/infNFSe/xLocPrestacao;
+        // o pais, de infDPS/serv/locPrest/cPaisPrestacao. O grupo locPrest costuma
+        // trazer so o codigo IBGE, entao o nome e resolvido pela tabela quando falta.
+        $nome = $this->value('xLocPrestacao', $this->infNFSe)
+            ?: $this->firstValue(['xLocPrestacao', 'xLocPrest'], $loc);
+        $uf = $this->value('UF', $loc);
+
+        // A NT pede "Municipio / UF / Pais", mas o grupo locPrest nao carrega UF:
+        // ela e derivada do codigo IBGE, assim como o nome quando ele falta.
+        if ($nome === '' || $uf === '') {
+            list($nomeIbge, $ufIbge) = $this->lookupMunicipio(
+                (string) $this->firstValue(['cLocPrestacao', 'cLocPrest'], $loc)
+            );
+            $nome = $nome ?: $nomeIbge;
+            $uf = $uf ?: $ufIbge;
+        }
+
         return $this->dash($this->joinNonEmpty([
-            $this->firstValue(['xLocPrestacao', 'xLocPrest', 'cLocPrest'], $loc),
-            $this->value('UF', $loc),
+            $nome,
+            $uf,
             $this->value('cPaisPrestacao', $loc)
         ], ' / '));
     }
 
     private function issqnLocal(?DOMElement $tribMun)
     {
+        // NT-008 secao 2.4.5: a localidade de incidencia do ISSQN vive em
+        // NFSe/infNFSe/ (xLocIncid / cLocIncid), nao dentro do grupo tribMun.
+        $nome = $this->value('xLocIncid', $this->infNFSe)
+            ?: $this->value('xLocIncid', $tribMun);
+        $uf = $this->value('UF', $tribMun);
+
+        // Mesma regra do local da prestacao: a UF vem do codigo IBGE.
+        if ($nome === '' || $uf === '') {
+            $codigo = $this->value('cLocIncid', $this->infNFSe)
+                ?: $this->value('cLocIncid', $tribMun);
+            list($nomeIbge, $ufIbge) = $this->lookupMunicipio((string) $codigo);
+            $nome = $nome ?: $nomeIbge;
+            $uf = $uf ?: $ufIbge;
+        }
+
         return $this->dash($this->joinNonEmpty([
-            $this->firstValue(['xLocIncid', 'cLocIncid'], $tribMun),
-            $this->value('UF', $tribMun),
+            $nome,
+            $uf,
             $this->value('cPaisResult', $tribMun)
         ], ' / '));
     }
@@ -1078,6 +1113,16 @@ class Danfse extends DaCommon
             return $this->formatField($digits, '(##) #####-####');
         }
         return $phone;
+    }
+
+    /** NT-008 secao 2.4.5: codigo de tributacao nacional no formato nn.nn.nn. */
+    private function formatTribNac($codigo)
+    {
+        $digits = preg_replace('/\D/', '', $codigo);
+        if (strlen($digits) === 6) {
+            return substr($digits, 0, 2) . '.' . substr($digits, 2, 2) . '.' . substr($digits, 4, 2);
+        }
+        return $codigo;
     }
 
     private function formatNbs($nbs)
