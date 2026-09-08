@@ -644,13 +644,11 @@ class Danfse extends DaCommon
 
     private function drawWatermark()
     {
-        $cStat = $this->value('cStat', $this->infNFSe);
-
-        if ($this->canceled || $cStat === '2') {
+        if ($this->canceled) {
             $this->watermark('CANCELADA');
             return;
         }
-        if ($this->substituted || $cStat === '3') {
+        if ($this->substituted) {
             $this->watermark('SUBSTITUÍDA');
         }
     }
