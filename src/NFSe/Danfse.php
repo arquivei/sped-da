@@ -408,11 +408,25 @@ class Danfse extends DaCommon
             return $this->drawMessageBlock($missingMessage, $y);
         }
 
-        $end = $this->childNode('end', $node);
+        $end = $this->addressGroup($node);
 
         $tpEmit = $this->tpEmit($this->value('tpEmit', $this->infDPS));
-        if ($title === "PRESTADOR / FORNECEDOR" && $node->tagName === "prest" && $tpEmit === "Prestador") {
-            $nome = $this->value('xNome', $this->firstNode('emit', $this->infNFSe));
+        $prestadorEhEmitente = $title === "PRESTADOR / FORNECEDOR"
+            && $node->tagName === "prest"
+            && $tpEmit === "Prestador";
+
+        if ($prestadorEhEmitente) {
+            // NT-008 secao 2.4.5 manda ler nome e endereco do prestador de
+            // infDPS/prest, mas o leiaute nacional nao repete esses dados no
+            // DPS. Com tpEmit 1 o emitente e o proprio prestador, entao
+            // infNFSe/emit supre a lacuna. Com tpEmit 2 ou 3 o emitente e o
+            // tomador ou o intermediario: o quadro fica vazio em vez de exibir
+            // o endereco de outra parte da operacao.
+            $emit = $this->firstNode('emit', $this->infNFSe);
+            $nome = $this->value('xNome', $emit);
+            if ($emit && !$this->addressNode($end)) {
+                $end = $this->addressGroup($emit);
+            }
         } else {
             $nome = $this->value('xNome', $node);
         }
@@ -870,11 +884,37 @@ class Danfse extends DaCommon
             || $this->value('xNome', $node) !== '';
     }
 
+    /**
+     * Grupo de endereco de uma pessoa (prest, toma, dest, interm ou emit).
+     *
+     * A NT-008 secao 2.4.5 preve o wrapper <end>, mas emissores reais publicam
+     * <endNac> direto sob a pessoa. Os dois casos sao aceitos, e a busca fica
+     * sempre presa ao no da pessoa: nunca se procura endereco fora dele.
+     */
+    private function addressGroup(?DOMElement $person)
+    {
+        if (!$person) {
+            return null;
+        }
+        return $this->childNode('end', $person) ?: $person;
+    }
+
+    private function addressNode(?DOMElement $end)
+    {
+        if (!$end) {
+            return null;
+        }
+        return $this->firstNode('endNac', $end)
+            ?: $this->firstNode('enderNac', $end)
+            ?: $this->firstNode('endExt', $end);
+    }
+
     private function municipioUf(?DOMElement $end)
     {
-        $nac = $this->firstNode('endNac', $end) ?: $this->firstNode('enderNac', $end);
-        $ext = $this->firstNode('endExt', $end);
-        $base = $nac ?: $ext;
+        $base = $this->addressNode($end);
+        if (!$base) {
+            return $this->dash('');
+        }
 
         $nome = $this->firstValue(['xMun', 'xCidade'], $base);
         $uf = $this->value('UF', $base);
@@ -898,9 +938,10 @@ class Danfse extends DaCommon
 
     private function ibgeCep(?DOMElement $end)
     {
-        $nac = $this->firstNode('endNac', $end) ?: $this->firstNode('enderNac', $end);
-        $ext = $this->firstNode('endExt', $end);
-        $base = $nac ?: $ext;
+        $base = $this->addressNode($end);
+        if (!$base) {
+            return $this->dash('');
+        }
         $cep = $this->value('CEP', $base);
         if (!empty($cep) && strlen(preg_replace('/\D/', '', $cep)) === 8) {
             $cep = $this->formatField($cep, '##.###-###');
@@ -913,6 +954,9 @@ class Danfse extends DaCommon
 
     private function address(?DOMElement $end)
     {
+        if (!$end) {
+            return $this->dash('');
+        }
         return $this->dash($this->joinNonEmpty([
             $this->value('xLgr', $end),
             $this->value('nro', $end),
