@@ -475,9 +475,11 @@ class Danfse extends DaCommon
             $this->formatTribNac($this->value('cTribNac', $cServ)),
             $this->value('cTribMun', $cServ)
         ], ' / ');
-        $descCodigo = $this->value('xTribMun', $cServ);
+        // NT-008 secao 2.4.5: as descricoes dos codigos sao geradas pela Sefin
+        // em infNFSe; so os codigos ficam em infDPS/serv/cServ.
+        $descCodigo = $this->value('xTribMun', $this->infNFSe);
         if (empty($descCodigo)) {
-            $descCodigo = $this->value('xTribNac', $cServ);
+            $descCodigo = $this->value('xTribNac', $this->infNFSe);
         }
 
         $this->drawSectionTitle('SERVIÇO PRESTADO', self::X, $y, self::CELL, self::ROW);
