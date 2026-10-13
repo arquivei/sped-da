@@ -6,9 +6,28 @@ use InvalidArgumentException;
 use NFePHP\DA\Legacy\Dom;
 use NFePHP\DA\Legacy\Pdf;
 use NFePHP\DA\Legacy\Common;
+use Com\Tecnick\Barcode\Barcode;
 
 class Danfe extends Common
 {
+
+    /**
+     * Frações da largura útil das colunas fixas do quadro de produtos da Reforma Tributária
+     * (NT 2026.010 4.3 e modelo de referência). A DESCRIÇÃO fica com o restante.
+     */
+    const COLUNAS_ITENS_RTC = [
+        'codigo' => 0.097,
+        'cstCfop' => 0.06,
+        'qtdUn' => 0.07,
+        'vlrUnit' => 0.059,
+        'vlrTotal' => 0.068,
+        'bases' => 0.116,
+        'aliquotas' => 0.15,
+        'valores' => 0.172,
+    ];
+
+    /** Fração da metade esquerda nos pares de ALÍQUOTAS e VALOR DOS TRIBUTOS (rótulos mais longos). */
+    const FRACAO_PAR_ESQUERDA = 0.595;
 
     /**
      * alinhamento padrão do logo (C-Center)
@@ -234,6 +253,18 @@ class Danfe extends Common
      * @var \DOMNode
      */
     protected $ISSQNtot;
+    /**
+     * Valores da Reforma Tributaria (IBS, CBS e IS) - NT 2026.010
+     *
+     * @var ReformaTributaria
+     */
+    protected $rtc;
+    /**
+     * Conteúdo de infNFeSupl/qrCode (ZX02), vazio se ausente
+     *
+     * @var string
+     */
+    protected $qrCode = '';
     /**
      * Node
      * @var \DOMNode
@@ -580,8 +611,12 @@ class Danfe extends Common
         if ($hdadosadic < 10) {
             $hdadosadic = 10;
         }
+        //QR Code no quadro reservado ao fisco precisa de espaço legível
+        if ($this->qrCode !== '' && $hdadosadic < 30) {
+            $hdadosadic = 30;
+        }
         //altura disponivel para os campos da DANFE
-        $hcabecalho = 47;//para cabeçalho
+        $hcabecalho = 47 + ($this->rtc->possuiGrupos() ? 7 : 0);//para cabeçalho (+ regime tributário)
         $hdestinatario = 25;//para destinatario
         $hduplicatas = 12;//para cada grupo de 7 duplicatas
         if (isset($this->entrega)) {
@@ -594,7 +629,7 @@ class Danfe extends Common
         } else {
             $hlocalretirada = 0;
         }
-        $himposto = 18;// para imposto
+        $himposto = 18 + $this->alturaTotaisReformaTributaria();// para imposto (+ IBS/CBS/IS)
         $htransporte = 25;// para transporte
         $hissqn = 11;// para issqn
         $hfooter = 5;// para rodape
@@ -615,23 +650,19 @@ class Danfe extends Common
         }
         $hDispo2 = $this->hPrint - 10 - ($hcabecalho + $hfooter + $hCabecItens)-4;
         //Contagem da altura ocupada para impressão dos itens
-        $fontProduto = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>''];
-        $numlinhas = 0;
         $hUsado = $hCabecItens;
-        $w2 = round($w*0.28, 0);
+        $w2 = $this->larguraDescricao($w);
         $hDispo = $hDispo1;
         $totPag = 1;
         $i = 0;
         while ($i < $this->det->length) {
-            $texto = $this->descricaoProduto($this->det->item($i));
-            $numlinhas = $this->pdf->getNumLines($texto, $w2, $fontProduto);
-            $hUsado += round(($numlinhas * $this->pdf->fontSize) + ($numlinhas * 0.5), 2);
-            if ($hUsado > $hDispo) {
+            $hUsado += $this->alturaItem($this->det->item($i), $w2);
+            if (!$this->itensCabemNaPagina($hUsado, $hDispo)) {
                 $totPag++;
                 $hDispo = $hDispo2;
                 $hUsado = $hCabecItens;
                 // Remove canhoto para páginas secundárias em modo paisagem ('L')
-                $w2 = round($this->wPrint*0.28, 0);
+                $w2 = $this->larguraDescricao($this->wPrint);
                 $i--; // decrementa para readicionar o item que não coube nessa pagina na outra.
             }
             $i++;
@@ -691,6 +722,9 @@ class Danfe extends Common
         }
         //coloca os dados dos impostos e totais da NFe
         $y = $this->imposto($x, $y+1);
+        if ($this->rtc->possuiGrupos()) {
+            $y = $this->totaisReformaTributaria($x, $y+1);
+        }
         //coloca os dados do trasnporte
         $y = $this->transporte($x, $y+1);
         //itens da DANFE
@@ -1277,6 +1311,23 @@ class Danfe extends Common
         }
         $aFont = ['font'=>$this->fontePadrao, 'size'=>10, 'style'=>'B'];
         $this->pdf->textBox($x, $y, $w, $h, $texto, $aFont, 'B', 'C', 0, '');
+
+        //####################################################################################
+        //REGIME TRIBUTÁRIO (NT 2026.010 4.2) - só em notas com IBS/CBS/IS
+        if ($this->rtc->possuiGrupos()) {
+            $y += $h;
+            $oldY += $h;
+            $x = $oldX;
+            $w = round($maxW * 0.5, 0);
+            $aFont = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
+            $this->pdf->textBox($x, $y, $w, $h, 'CÓDIGO DO REGIME TRIBUTÁRIO', $aFont, 'T', 'L', 1, '');
+            $aFont = ['font'=>$this->fontePadrao, 'size'=>10, 'style'=>'B'];
+            $this->pdf->textBox($x, $y, $w, $h, $this->rtc->descricaoCrt(), $aFont, 'B', 'C', 0, '');
+            $x += $w;
+            $w = $maxW - $w;
+            $aFont = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
+            $this->pdf->textBox($x, $y, $w, $h, 'TIPO DE REGIME DE APURAÇÃO DO IBS E DA CBS', $aFont, 'T', 'L', 1, '');
+        }
 
         //####################################################################################
         //Indicação de NF Homologação, cancelamento e falta de protocolo
@@ -2323,6 +2374,76 @@ class Danfe extends Common
     } //fim imposto
 
     /**
+     * totaisReformaTributaria
+     * Bloco "TOTAL DO IBS / CBS / IS" (NT 2026.010 4.1), abaixo do calculo do imposto.
+     *
+     * @param  number $x Posição horizontal canto esquerdo
+     * @param  number $y Posição vertical canto superior
+     * @return number Posição vertical final
+     */
+    protected function totaisReformaTributaria($x, $y)
+    {
+        if ($this->orientacao == 'P') {
+            $maxW = $this->wPrint;
+        } else {
+            $maxW = $this->wPrint - $this->wCanhoto;
+        }
+        $aFont = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>'B'];
+        $this->pdf->textBox($x, $y, $maxW, 8, 'TOTAL DO IBS / CBS / IS', $aFont, 'T', 'L', 0, '');
+        $y += 3;
+        $h = 7;
+        $w = $maxW / 4;
+        $totais = $this->rtc->totais();
+        $linhas = [[
+            'VALOR DA CBS' => 'vCBS',
+            'VALOR DO IBS UF' => 'vIBSUF',
+            'VALOR DO IBS MUNICÍPIO' => 'vIBSMun',
+            'VALOR DO IMPOSTO SELETIVO' => 'vIS',
+        ]];
+        if ($this->rtc->exibeMonofasicos()) {
+            $linhas[] = [
+                'VALOR DO IBS MONOFÁSICO' => 'vIBSMono',
+                'VALOR DA CBS MONOFÁSICA' => 'vCBSMono',
+                'VALOR DO IBS MONOFÁSICO POR RETENÇÃO' => 'vIBSMonoReten',
+                'VALOR DA CBS MONOFÁSICA POR RETENÇÃO' => 'vCBSMonoReten',
+            ];
+        }
+        foreach ($linhas as $campos) {
+            $xCampo = $x;
+            foreach ($campos as $titulo => $chave) {
+                $xCampo = $this->celulaValor($xCampo, $y, $w, $h, $titulo, $totais[$chave]);
+            }
+            $y += $h;
+        }
+        return $y;
+    }
+
+    /**
+     * Altura ocupada pelo bloco de totais da Reforma Tributaria, incluindo o espaçamento anterior.
+     *
+     * @return int
+     */
+    protected function alturaTotaisReformaTributaria()
+    {
+        if (!$this->rtc->possuiGrupos()) {
+            return 0;
+        }
+        return 1 + 3 + 7 * ($this->rtc->exibeMonofasicos() ? 2 : 1);
+    }
+
+    /**
+     * Célula de valor no mesmo estilo de impostoHelper(), com o valor já formatado.
+     */
+    protected function celulaValor($x, $y, $w, $h, $titulo, $valor)
+    {
+        $fontTitulo = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
+        $fontValor = ['font'=>$this->fontePadrao, 'size'=>10, 'style'=>'B'];
+        $this->pdf->textBox($x, $y, $w, $h, $titulo, $fontTitulo, 'T', 'L', 1, '');
+        $this->pdf->textBox($x, $y, $w, $h, $valor, $fontValor, 'B', 'R', 0, '');
+        return $x + $w;
+    }
+
+    /**
      * transporte
      * Monta o campo de transportes da DANFE (retrato e paisagem)
      *
@@ -2675,22 +2796,34 @@ class Danfe extends Common
         $ICMS = $itemProd->getElementsByTagName("ICMS")->item(0);
         $ICMSUFDest = $itemProd->getElementsByTagName("ICMSUFDest")->item(0);
         $impostos = '';
+        // Complementos mantidos nas notas com IBS/CBS/IS: o FCP do item (o MOC 7.0 Anexo II, 3.1.7, manda
+        // informá-lo junto das informações adicionais do produto) e a redução da BC do ICMS próprio (pRedBC)
+        $complementoRtc = '';
 
         if (!empty($ICMS)) {
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vBCFCP", " BcFcp=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "pFCP", " pFcp=%s%%");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vFCP", " vFcp=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "pRedBC", " pRedBC=%s%%");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "pMVAST", " IVA/MVA=%s%%");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "pICMSST", " pIcmsSt=%s%%");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vBCST", " BcIcmsSt=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vICMSST", " vIcmsSt=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vBCFCPST", " BcFcpSt=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "pFCPST", " pFcpSt=%s%%");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vFCPST", " vFcpSt=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vBCSTRet", " Retido na compra: BASE ICMS ST=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "pST", " pSt=%s");
-            $impostos .= $this->descricaoProdutoHelper($ICMS, "vICMSSTRet", " VALOR ICMS ST=%s");
+            $campos = [
+                ["vBCFCP", " BcFcp=%s", true],
+                ["pFCP", " pFcp=%s%%", true],
+                ["vFCP", " vFcp=%s", true],
+                ["pRedBC", " pRedBC=%s%%", true],
+                ["pMVAST", " IVA/MVA=%s%%", false],
+                ["pICMSST", " pIcmsSt=%s%%", false],
+                ["vBCST", " BcIcmsSt=%s", false],
+                ["vICMSST", " vIcmsSt=%s", false],
+                ["vBCFCPST", " BcFcpSt=%s", true],
+                ["pFCPST", " pFcpSt=%s%%", true],
+                ["vFCPST", " vFcpSt=%s", true],
+                ["vBCSTRet", " Retido na compra: BASE ICMS ST=%s", false],
+                ["pST", " pSt=%s", false],
+                ["vICMSSTRet", " VALOR ICMS ST=%s", false],
+            ];
+            foreach ($campos as list($campo, $formato, $mantidoNaReforma)) {
+                $trecho = $this->descricaoProdutoHelper($ICMS, $campo, $formato);
+                $impostos .= $trecho;
+                if ($mantidoNaReforma) {
+                    $complementoRtc .= $trecho;
+                }
+            }
         }
         if (!empty($ICMSUFDest)) {
             $impostos .= $this->descricaoProdutoHelper($ICMSUFDest, "pFCPUFDest", " pFCPUFDest=%s%%");
@@ -2731,7 +2864,11 @@ class Danfe extends Common
         //NT2013.006 FCI
         $nFCI = (! empty($itemProd->getElementsByTagName('nFCI')->item(0)->nodeValue)) ?
                 ' FCI:'.$itemProd->getElementsByTagName('nFCI')->item(0)->nodeValue : '';
-        $tmp_ad=$infAdProd . ($this->descProdInfoComplemento ? $loteTxt . $impostos . $nFCI : '');
+        // Notas com IBS/CBS/IS (NT 2026.010): a descrição segue o modelo de referência e mantém só o lote,
+        // o FCP do item e o pRedBC. Deixam de constar na descrição o DIFAL e o ICMS-ST do item (seguem nos
+        // totais da nota) e o FCI (só no XML).
+        $complemento = $this->rtc->possuiGrupos() ? $loteTxt . $complementoRtc : $loteTxt . $impostos . $nFCI;
+        $tmp_ad=$infAdProd . ($this->descProdInfoComplemento ? $complemento : '');
         $texto = $prod->getElementsByTagName("xProd")->item(0)->nodeValue
             . (strlen($tmp_ad)!=0?"\n    ".$tmp_ad:'');
         //decodifica os caracteres html no xml
@@ -2749,6 +2886,167 @@ class Danfe extends Common
         }
 
         return $texto;
+    }
+
+    /**
+     * Largura da coluna DESCRIÇÃO do quadro de itens. Única fonte para desenho e paginação.
+     *
+     * @param  float $w Largura útil do quadro de itens
+     * @return float
+     */
+    protected function larguraDescricao($w)
+    {
+        if ($this->rtc->possuiGrupos()) {
+            return $this->colunasItensReformaTributaria($w)['descricao'];
+        }
+        return round($w*0.2835, 0);
+    }
+
+    /**
+     * Larguras das colunas do quadro de produtos da Reforma Tributária, na ordem de desenho.
+     *
+     * @param  float $w Largura útil do quadro de itens
+     * @return array
+     */
+    protected function colunasItensReformaTributaria($w)
+    {
+        $fixas = [];
+        foreach (self::COLUNAS_ITENS_RTC as $coluna => $fracao) {
+            $fixas[$coluna] = round($w * $fracao, 1);
+        }
+        $descricao = $w - array_sum($fixas);
+        return ['codigo' => $fixas['codigo'], 'descricao' => $descricao] + $fixas;
+    }
+
+    /**
+     * Larguras das duas metades de uma célula de ALÍQUOTAS ou VALOR DOS TRIBUTOS.
+     *
+     * @param  float $wColuna Largura da coluna
+     * @return array [esquerda, direita]
+     */
+    protected function metadesDoPar($wColuna)
+    {
+        $esquerda = round($wColuna * self::FRACAO_PAR_ESQUERDA, 1);
+        return [$esquerda, $wColuna - $esquerda];
+    }
+
+    /**
+     * Linhas das colunas BASES DE CÁLCULO, ALÍQUOTAS e VALOR DOS TRIBUTOS (NT 2026.010 4.3).
+     * Só entra o que existe no XML (NT 2026.010 4.4). Alíquotas e valores têm as mesmas linhas,
+     * para ficarem alinhados: um par entra se qualquer uma das quatro informações existir.
+     *
+     * @return array
+     */
+    protected function linhasTributosItem(\DOMElement $det)
+    {
+        $tributos = $this->rtc->tributosItem($det);
+        $bases = [];
+        foreach (['ICMS', 'IBS/CBS', 'IS', 'IPI'] as $rotulo) {
+            if ($tributos[$rotulo] !== null && $tributos[$rotulo]['base'] !== null) {
+                $bases[] = [$rotulo, $tributos[$rotulo]['base']];
+            }
+        }
+        $aliquotas = [];
+        $valores = [];
+        foreach ([['ICMS', 'CBS'], ['IBS UF', 'IPI'], ['IBS MUN', 'IS']] as $par) {
+            $linhaAliquota = [];
+            $linhaValor = [];
+            foreach ($par as $rotulo) {
+                $tributo = $tributos[$rotulo];
+                $linhaAliquota[] = ($tributo !== null && $tributo['aliquota'] !== null)
+                    ? [$rotulo, $tributo['aliquota']] : null;
+                $linhaValor[] = ($tributo !== null && $tributo['valor'] !== null)
+                    ? [$rotulo, $tributo['valor']] : null;
+            }
+            if (array_filter($linhaAliquota) || array_filter($linhaValor)) {
+                $aliquotas[] = $linhaAliquota;
+                $valores[] = $linhaValor;
+            }
+        }
+        return ['bases' => $bases, 'aliquotas' => $aliquotas, 'valores' => $valores];
+    }
+
+    /**
+     * Linha de identificação abaixo da descrição: "[NCM 01234567] [cClassTrib 000001]".
+     *
+     * @return string
+     */
+    protected function identificacaoItem(\DOMElement $det)
+    {
+        $partes = [];
+        $ncm = $this->getTagValue($det->getElementsByTagName('prod')->item(0), 'NCM');
+        if ($ncm !== '') {
+            $partes[] = '[NCM ' . $ncm . ']';
+        }
+        $cClassTrib = $this->rtc->tributosItem($det)['cClassTrib'];
+        if ($cClassTrib !== null) {
+            $partes[] = '[cClassTrib ' . $cClassTrib . ']';
+        }
+        return implode(' ', $partes);
+    }
+
+    /**
+     * Linhas da coluna CST / CFOP: situação do ICMS (CST ou CSOSN, com a origem) e CFOP.
+     *
+     * @return array
+     */
+    protected function cstCfopItem(\DOMElement $det)
+    {
+        $linhas = [];
+        $situacao = $this->rtc->tributosItem($det)['situacaoIcms'];
+        if ($situacao !== null) {
+            $linhas[] = $situacao;
+        }
+        $linhas[] = ['CFOP', $this->getTagValue($det->getElementsByTagName('prod')->item(0), 'CFOP')];
+        return $linhas;
+    }
+
+    /**
+     * Regra única de quebra de página do quadro de itens, usada na contagem de páginas (monta)
+     * e no desenho (itens). Se as duas divergirem, a contagem aceita itens que o desenho empurra
+     * para a página seguinte e a última página recebe o excedente além da área disponível.
+     * Mantém a folga de 1 mm que o desenho sempre usou.
+     *
+     * @param  float $hUsado  Altura acumulada dos itens na página, incluindo o cabeçalho dos itens
+     * @param  float $hDispo  Altura disponível para os itens na página
+     * @return bool
+     */
+    protected function itensCabemNaPagina($hUsado, $hDispo)
+    {
+        return ($hDispo - $hUsado) >= 1;
+    }
+
+    /**
+     * Altura do item no quadro de produtos. Usada tanto na contagem de páginas (monta) quanto no desenho (itens).
+     * Quadro atual: descrição + veículo 0 km. Quadro da Reforma Tributária: o maior entre a coluna DESCRIÇÃO
+     * (descrição + identificação + veículo) e as colunas empilhadas e de tributos.
+     *
+     * @return float
+     */
+    protected function alturaItem(\DOMElement $det, $wDescricao)
+    {
+        $fonte = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>''];
+        $linhas = $this->pdf->getNumLines(trim($this->descricaoProduto($det)), $wDescricao, $fonte);
+        $h = round(($linhas * $this->pdf->fontSize) + ($linhas * 0.5), 2);
+        $rtc = $this->rtc->possuiGrupos();
+        if ($rtc) {
+            $identificacao = $this->identificacaoItem($det);
+            if ($identificacao !== '') {
+                $fonteId = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
+                $linhasId = $this->pdf->getNumLines($identificacao, $wDescricao, $fonteId);
+                $h += round(($linhasId * $this->pdf->fontSize) + ($linhasId * 0.5), 2);
+            }
+        }
+        if ($det->getElementsByTagName('veicProd')->length > 0) {
+            $h += 32;
+        }
+        if ($rtc) {
+            $tributos = $this->linhasTributosItem($det);
+            $linhasColunas = max(2, count($tributos['bases']), count($tributos['aliquotas']));
+            $this->pdf->setFont($this->fontePadrao, '', 6);
+            $h = max($h, round(($linhasColunas * $this->pdf->fontSize) + ($linhasColunas * 0.5), 2));
+        }
+        return $h;
     }
 
     /**
@@ -2774,7 +3072,8 @@ class Danfe extends Common
         if ($this->orientacao == 'P') {
             $w = $this->wPrint;
         } else {
-            if ($nInicio < 2) { // primeira página
+            // canhoto só na primeira página; decide pela página (não pelo índice do item), como em monta()
+            if ($pag < 2) { // primeira página
                 $w = $this->wPrint - $this->wCanhoto;
             } else { // páginas seguintes
                 $w = $this->wPrint;
@@ -2784,6 +3083,9 @@ class Danfe extends Common
         $aFont = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>'B'];
         $this->pdf->textBox($x, $y, $w, $h, $texto, $aFont, 'T', 'L', 0, '');
         $y += 3;
+        if ($this->rtc->possuiGrupos()) {
+            return $this->itensReformaTributaria($x, $y, $oldY, $nInicio, $hmax, $pag, $totpag, $hCabecItens, $w);
+        }
         //##################################################################################
         // cabecalho LOOP COM OS DADOS DOS PRODUTOS
         //CÓDIGO PRODUTO
@@ -2795,7 +3097,7 @@ class Danfe extends Common
 
         //DESCRIÇÃO DO PRODUTO / SERVIÇO
         $x += $w1;
-        $w2 = round($w*0.2835, 0);
+        $w2 = $this->larguraDescricao($w);
         $texto = 'DESCRIÇÃO DO PRODUTO / SERVIÇO';
         $aFont = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
         $this->pdf->textBox($x, $y, $w2, $h, $texto, $aFont, 'C', 'C', 0, '', false);
@@ -2896,20 +3198,13 @@ class Danfe extends Common
                 $IPI  = $imposto->getElementsByTagName("IPI")->item(0);
 
                 $textoProduto = trim($this->descricaoProduto($thisItem));
-                $linhaDescr = $this->pdf->getNumLines($textoProduto, $w2, $aFont);
-                $h = round(($linhaDescr * $this->pdf->fontSize)+ ($linhaDescr * 0.5), 2);
-
-                // Dados do Veiculo Somente para veiculo 0 Km
+                // altura inclui +32 do veículo 0 km
+                $h = $this->alturaItem($thisItem, $w2);
                 $veicProd = $prod->getElementsByTagName("veicProd")->item(0);
-                // Se for um veiculo separa +32 de distancia para os novos dados que entram na descrição
-                if (!empty($veicProd)) {
-                    $h += 32;
-                }
 
                 $hUsado += $h;
-                $diffH = $hmax - $hUsado;
                 if ($pag != $totpag) {
-                    if (1 > $diffH && $i < $totItens) {
+                    if (!$this->itensCabemNaPagina($hUsado, $hmax) && $i < $totItens) {
                         //ultrapassa a capacidade para uma única página
                         //o restante dos dados serão usados nas proximas paginas
                         $nInicio = $i;
@@ -2925,11 +3220,7 @@ class Danfe extends Common
                 $x += $w1;
 
                 //DESCRIÇÃO
-                if ($this->orientacao == 'P') {
-                    $sizeDescr = $this->pdf->textBox($x, $y, $w2, $h, $textoProduto, $aFont, 'T', 'L', 0, '', false);
-                } else {
-                    $sizeDescr = $this->pdf->textBox($x, $y, $w2, $h, $textoProduto, $aFont, 'T', 'L', 0, '', false);
-                }
+                $sizeDescr = $this->pdf->textBox($x, $y, $w2, $h, $textoProduto, $aFont, 'T', 'L', 0, '', false);
                 // Tag somente é gerada para veiculo 0k, e só é permitido um veiculo por NF-e por conta do detran
                 // Verifica se a Tag existe
                 if (!empty($veicProd)) {
@@ -3100,6 +3391,194 @@ class Danfe extends Common
         $this->pdf->line($x, $oldY+3, $x, $y+3);
 
         return $y;
+    }
+
+    /**
+     * Quadro "Dados dos Produtos/Serviços" das notas com IBS/CBS/IS, conforme o modelo de referência
+     * da NT 2026.010 (4.3), mantendo a coluna CÓDIGO PRODUTO.
+     *
+     * @return float Posição vertical final
+     */
+    protected function itensReformaTributaria($x, $y, $oldY, &$nInicio, $hmax, $pag, $totpag, $hCabecItens, $w)
+    {
+        $oldX = $x;
+        $totItens = $this->det->length;
+        $col = $this->colunasItensReformaTributaria($w);
+        $cabecalhos = [
+            'codigo' => 'CÓDIGO PRODUTO',
+            'descricao' => 'DESCRIÇÃO DO PRODUTO / SERVIÇO',
+            'cstCfop' => 'CST / CFOP',
+            'qtdUn' => 'QTD / UN',
+            'vlrUnit' => 'VLR UNIT',
+            'vlrTotal' => 'VLR TOTAL',
+            'bases' => 'BASES DE CÁLCULO',
+            'aliquotas' => 'ALÍQUOTAS',
+            'valores' => 'VALOR DOS TRIBUTOS',
+        ];
+        $h = 4;
+        $fonte6 = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
+        $fonte7 = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>''];
+        foreach ($cabecalhos as $coluna => $texto) {
+            $this->pdf->textBox($x, $y, $col[$coluna], $h, $texto, $fonte6, 'C', 'C', 0, '', false);
+            $x += $col[$coluna];
+        }
+        $this->pdf->line($oldX, $y+$h+1, $oldX + $w, $y+$h+1);
+        $y += 5;
+        $i = 0;
+        $hUsado = $hCabecItens;
+        foreach ($this->det as $d) {
+            if ($i < $nInicio) {
+                $i++;
+                continue;
+            }
+            $thisItem = $this->det->item($i);
+            $prod = $thisItem->getElementsByTagName('prod')->item(0);
+            $h = $this->alturaItem($thisItem, $col['descricao']);
+            $hUsado += $h;
+            if ($pag != $totpag && !$this->itensCabemNaPagina($hUsado, $hmax) && $i < $totItens) {
+                $nInicio = $i;
+                break;
+            }
+            $x = $oldX;
+            //CÓDIGO PRODUTO
+            $cProd = $this->getTagValue($prod, 'cProd');
+            $this->pdf->textBox($x, $y, $col['codigo'], $h, $cProd, $fonte7, 'T', 'C', 0, '');
+            $x += $col['codigo'];
+            //DESCRIÇÃO + identificação (NCM e cClassTrib) + veículo 0 km
+            $textoProduto = trim($this->descricaoProduto($thisItem));
+            $wDescr = $col['descricao'];
+            $sizeDescr = $this->pdf->textBox($x, $y, $wDescr, $h, $textoProduto, $fonte7, 'T', 'L', 0, '', false);
+            $identificacao = $this->identificacaoItem($thisItem);
+            if ($identificacao !== '') {
+                $sizeDescr += $this->pdf->textBox(
+                    $x,
+                    $y + $sizeDescr,
+                    $col['descricao'],
+                    $h - $sizeDescr,
+                    $identificacao,
+                    $fonte6,
+                    'T',
+                    'L',
+                    0,
+                    '',
+                    false
+                );
+            }
+            $veicProd = $prod->getElementsByTagName('veicProd')->item(0);
+            if (!empty($veicProd)) {
+                $this->dadosItenVeiculoDANFE($x, $y + $sizeDescr, $nInicio, $h, $prod);
+            }
+            $x += $col['descricao'];
+            //CST / CFOP
+            $this->linhasRotuloValor($x, $y, $col['cstCfop'], $this->cstCfopItem($thisItem), $fonte6);
+            $x += $col['cstCfop'];
+            //QTD / UN
+            $qCom = $this->getTagValue($prod, 'qCom');
+            $texto = ($qCom !== '' ? number_format($qCom, 4, ',', '.') : '') . "\n" . $this->getTagValue($prod, 'uCom');
+            $this->pdf->textBox($x, $y, $col['qtdUn'], $h, $texto, $fonte6, 'T', 'C', 0, '');
+            $x += $col['qtdUn'];
+            //VLR UNIT
+            $vUnCom = $this->getTagValue($prod, 'vUnCom');
+            $texto = $vUnCom !== '' ? number_format($vUnCom, 4, ',', '.') : '';
+            $fonte = ['size' => $this->tamanhoFonteQueCabe($texto, $col['vlrUnit'])] + $fonte7;
+            $this->pdf->textBox($x, $y, $col['vlrUnit'], $h, $texto, $fonte, 'T', 'R', 0, '');
+            $x += $col['vlrUnit'];
+            //VLR TOTAL
+            $vProd = $this->getTagValue($prod, 'vProd');
+            $texto = is_numeric($vProd) ? number_format($vProd, 2, ',', '.') : '';
+            $fonte = ['size' => $this->tamanhoFonteQueCabe($texto, $col['vlrTotal'])] + $fonte7;
+            $this->pdf->textBox($x, $y, $col['vlrTotal'], $h, $texto, $fonte, 'T', 'R', 0, '');
+            $x += $col['vlrTotal'];
+            //BASES DE CÁLCULO, ALÍQUOTAS e VALOR DOS TRIBUTOS
+            $tributos = $this->linhasTributosItem($thisItem);
+            $this->linhasRotuloValor($x, $y, $col['bases'], $tributos['bases'], $fonte6);
+            $x += $col['bases'];
+            foreach (['aliquotas', 'valores'] as $coluna) {
+                list($wEsquerda, $wDireita) = $this->metadesDoPar($col[$coluna]);
+                $esquerda = array_map(function ($par) {
+                    return $par[0];
+                }, $tributos[$coluna]);
+                $direita = array_map(function ($par) {
+                    return $par[1];
+                }, $tributos[$coluna]);
+                $this->linhasRotuloValor($x, $y, $wEsquerda, $esquerda, $fonte6);
+                $this->linhasRotuloValor($x + $wEsquerda, $y, $wDireita, $direita, $fonte6);
+                $x += $col[$coluna];
+            }
+            // linha entre itens
+            $this->pdf->dashedHLine($oldX, $y + $h, $w, 0.1, 120);
+            $y += $h;
+            $i++;
+            //incrementa o controle dos itens processados.
+            $this->qtdeItensProc++;
+        }
+        //desenha a caixa dos dados dos itens da NF e as divisões das colunas
+        $this->pdf->textBox($oldX, $oldY+3, $w, ($y - $oldY));
+        $x = $oldX;
+        foreach (array_slice($col, 0, -1) as $largura) {
+            $x += $largura;
+            $this->pdf->line($x, $oldY+3, $x, $y+3);
+        }
+        return $y;
+    }
+
+    /**
+     * Maior tamanho de fonte (de $tamanho até $minimo) em que o texto cabe na largura com 1 mm de folga.
+     * O textBox só reduz a fonte quando o texto passa da largura e alinha à direita com 0,5 mm de margem,
+     * então um texto entre (largura - 0,5) e largura começaria antes da divisória da esquerda.
+     *
+     * @return int
+     */
+    protected function tamanhoFonteQueCabe($texto, $w, $tamanho = 7, $minimo = 5)
+    {
+        while ($tamanho > $minimo) {
+            $this->pdf->setFont($this->fontePadrao, '', $tamanho);
+            if ($this->pdf->getStringWidth($texto) + 1 <= $w) {
+                break;
+            }
+            $tamanho--;
+        }
+        return $tamanho;
+    }
+
+    /**
+     * Desenha uma linha por elemento: rótulo à esquerda e valor à direita; null deixa a linha em branco.
+     * O rótulo fica na fonte da coluna; o valor, na maior fonte em que cabe ao lado do rótulo
+     * (tamanhoFonteDoValor()), com a mesma linha de base do rótulo.
+     *
+     * @param array $linhas [[rótulo, valor] | null, ...]
+     */
+    protected function linhasRotuloValor($x, $y, $w, array $linhas, array $fonte)
+    {
+        $this->pdf->setFont($fonte['font'], $fonte['style'], $fonte['size']);
+        $altura = $this->pdf->fontSize;
+        foreach ($linhas as $n => $linha) {
+            if ($linha === null) {
+                continue;
+            }
+            $yLinha = $y + ($n * $altura);
+            $this->pdf->textBox($x, $yLinha, $w, $altura, $linha[0], $fonte, 'T', 'L', 0, '');
+            $tamanho = $this->tamanhoFonteDoValor($linha[0], $linha[1], $w, $fonte);
+            // o textBox posiciona a linha de base a uma altura de fonte do topo: desce o valor menor
+            $alturaValor = $altura * $tamanho / $fonte['size'];
+            $fonteValor = ['size' => $tamanho] + $fonte;
+            $yValor = $yLinha + $altura - $alturaValor;
+            $this->pdf->textBox($x, $yValor, $w, $alturaValor, $linha[1], $fonteValor, 'T', 'R', 0, '');
+        }
+    }
+
+    /**
+     * Fonte do valor de uma linha rótulo/valor: a maior, de $fonte['size'] até 4, em que o valor cabe
+     * à direita do rótulo (na fonte da coluna) com pelo menos 0,5 mm entre os dois, além das margens
+     * de 0,5 mm de cada lado do textBox: rótulo + 0,5 + valor + 1 <= largura.
+     *
+     * @return int
+     */
+    protected function tamanhoFonteDoValor($rotulo, $valor, $w, array $fonte)
+    {
+        $this->pdf->setFont($fonte['font'], $fonte['style'], $fonte['size']);
+        $wRotulo = $this->pdf->getStringWidth($rotulo);
+        return $this->tamanhoFonteQueCabe($valor, $w - $wRotulo - 0.5, $fonte['size'], 4);
     }
 
     /**
@@ -3406,6 +3885,7 @@ class Danfe extends Common
         }
         $aFont = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>'B'];
         $this->pdf->textBox($x, $y, $w, $h, $texto, $aFont, 'T', 'L', 1, '');
+        $ladoQr = $this->qrCodeReservadoFisco($x, $y, $w, $h);
         //inserir texto informando caso de contingência
         // 1 - Normal - emissão normal;
         // 2 - Contingência FS - emissão em contingência com impressão do DANFE em Formulário de Segurança;
@@ -3441,8 +3921,55 @@ class Danfe extends Common
         }
         $y += 2;
         $aFont = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>''];
-        $this->pdf->textBox($x, $y, $w-2, $h-3, $texto, $aFont, 'T', 'L', 0, '', false);
+        //quando há QR Code, a coluna ocupada por ele (lado + margem) não pode ser invadida pelo texto
+        $wTexto = $w - 2;
+        if ($ladoQr > 0) {
+            $wTexto -= $ladoQr + 2;
+        }
+        $this->pdf->textBox($x, $y, $wTexto, $h-3, $texto, $aFont, 'T', 'L', 0, '', false);
         return $y+$h;
+    }
+
+    /**
+     * Desenha o QR Code de infNFeSupl/qrCode (NT 2026.010 4.5) no canto do quadro "RESERVADO AO FISCO".
+     *
+     * @return float lado (em mm) ocupado pelo QR Code, ou 0 quando nada foi desenhado. Usado pelo
+     *               chamador para reduzir a largura do texto de contingência e evitar sobreposição.
+     */
+    protected function qrCodeReservadoFisco($x, $y, $w, $h)
+    {
+        $lado = $this->qrCodeLado($w, $h);
+        if ($lado <= 0) {
+            return 0;
+        }
+        $png = (new Barcode())
+            ->getBarcodeObj('QRCODE,M', $this->qrCode, -4, -4, 'black', [-2, -2, -2, -2])
+            ->setBackgroundColor('white')
+            ->getPngData();
+        $this->pdf->image(
+            'data://text/plain;base64,' . base64_encode($png),
+            $x + $w - $lado - 2,
+            $y + 4,
+            $lado,
+            $lado,
+            'PNG'
+        );
+        return $lado;
+    }
+
+    /**
+     * Calcula o lado (em mm) do QR Code de infNFeSupl/qrCode dentro do quadro "RESERVADO AO FISCO",
+     * ou 0 quando não há QR Code a desenhar. Mantido em um único lugar para que o desenho do QR
+     * (qrCodeReservadoFisco) e a redução da largura do texto de contingência (dadosAdicionais)
+     * concordem sobre o espaço ocupado.
+     */
+    protected function qrCodeLado($w, $h)
+    {
+        if ($this->qrCode === '') {
+            return 0;
+        }
+        $lado = min($h - 5, $w - 4, 30);
+        return $lado > 0 ? $lado : 0;
     }
 
     /**
@@ -3808,6 +4335,9 @@ class Danfe extends Common
             $this->tpEmis = $this->getTagValue($this->ide, "tpEmis");
             $this->tpImp = $this->getTagValue($this->ide, "tpImp");
             $this->infProt = $this->dom->getElementsByTagName("infProt")->item(0);
+            $this->rtc = new ReformaTributaria($this->dom);
+            $infNFeSupl = $this->dom->getElementsByTagName("infNFeSupl")->item(0);
+            $this->qrCode = $infNFeSupl ? trim($this->getTagValue($infNFeSupl, "qrCode")) : '';
         }
     }
 
