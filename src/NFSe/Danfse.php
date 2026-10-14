@@ -33,6 +33,10 @@ class Danfse extends DaCommon
     private const ROW = 6.3;
     private const ROW_TOTAL = 6.7;
     private const TITLE_ROW = 3.9;
+    private const DESC_SERV_MIN_HEIGHT = 10.0;
+    /** Maior altura que ainda deixa 18mm para Informações Complementares com todos os quadros, canhoto e rodapé. */
+    private const DESC_SERV_MAX_HEIGHT = 38.0;
+    private const DESC_SERV_PADDING = 1.0;
     private const GRAY = 242;
     private const LABEL_FONT = 'arial';
     private const CONTENT_FONT = 'arial';
@@ -488,9 +492,47 @@ class Danfse extends DaCommon
         $this->drawField('Local da Prestação / Sigla UF / País', $this->localPrestacao($loc), self::COL4, $y, self::CELL, self::ROW);
         $this->drawValueOnly($this->ellipsis($descCodigo, 170), self::X, $y + 6.5, self::WIDTH, 4.0, false);
         $this->text(self::X + 0.8, $y + 10.9, self::WIDTH - 1.6, 2.2, 'Descrição do Serviço', $this->fontLabel(6, 'B'));
-        $this->drawValueOnly($this->ellipsis($this->value('xDescServ', $cServ), 1300), self::X, $y + 13.2, self::WIDTH, 10.0, false);
+        list($descricao, $altura) = $this->descricaoServico($this->ellipsis($this->value('xDescServ', $cServ), 1300));
+        $this->drawValueOnly($descricao, self::X, $y + 13.2, self::WIDTH, $altura, false);
 
-        return $y + 23.4;
+        return $y + 13.4 + $altura;
+    }
+
+    /**
+     * Quebra xDescServ como o textBox fará na impressão e devolve o texto e a altura
+     * do quadro. O xDescServ pode trazer quebras de linha, então a altura depende do
+     * número de linhas e não só do tamanho do texto; acima do limite o texto é cortado
+     * com reticências para não empurrar o restante do DANFSe para fora da página.
+     */
+    private function descricaoServico($value)
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return ['', self::DESC_SERV_MIN_HEIGHT];
+        }
+
+        $font = $this->fontContent(7);
+        $width = self::WIDTH - 1.6;
+        $lineHeight = $font['size'] * 25.4 / 72;
+        $maxLines = (int) floor((self::DESC_SERV_MAX_HEIGHT - self::DESC_SERV_PADDING) / $lineHeight);
+
+        $this->pdf->setFont($font['font'], $font['style'], $font['size']);
+        $wrapped = $this->toIso($text);
+        $this->pdf->wordWrap($wrapped, $width);
+        $lines = explode("\n", $wrapped);
+
+        if (count($lines) > $maxLines) {
+            $lines = array_slice($lines, 0, $maxLines);
+            $last = rtrim($lines[$maxLines - 1]);
+            while ($last !== '' && $this->pdf->getStringWidth($last . '...') > $width) {
+                $last = rtrim(substr($last, 0, -1));
+            }
+            $lines[$maxLines - 1] = $last . '...';
+        }
+
+        $height = max(self::DESC_SERV_MIN_HEIGHT, count($lines) * $lineHeight + self::DESC_SERV_PADDING);
+
+        return [iconv('ISO-8859-1', 'UTF-8', implode("\n", $lines)), $height];
     }
 
     private function drawIssqn($y, ?DOMElement $prest)
