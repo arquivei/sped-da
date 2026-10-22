@@ -3487,7 +3487,23 @@ class Danfe extends Common
             $vProd = $this->getTagValue($prod, 'vProd');
             $texto = is_numeric($vProd) ? number_format($vProd, 2, ',', '.') : '';
             $fonte = ['size' => $this->tamanhoFonteQueCabe($texto, $col['vlrTotal'])] + $fonte7;
-            $this->pdf->textBox($x, $y, $col['vlrTotal'], $h, $texto, $fonte, 'T', 'R', 0, '');
+            $sizeTotal = $this->pdf->textBox($x, $y, $col['vlrTotal'], $h, $texto, $fonte, 'T', 'R', 0, '');
+            //desconto do item abaixo do VLR TOTAL: "[VLR DESC 0,00]"; reduz a fonte até caber na coluna
+            $vDesc = $this->getTagValue($prod, 'vDesc');
+            $texto = '[VLR DESC ' . number_format(is_numeric($vDesc) ? $vDesc : 0, 2, ',', '.') . ']';
+            $fonte = ['size' => $this->tamanhoFonteQueCabe($texto, $col['vlrTotal'], 6, 3)] + $fonte6;
+            $this->pdf->textBox(
+                $x,
+                $y + $sizeTotal,
+                $col['vlrTotal'],
+                $h - $sizeTotal,
+                $texto,
+                $fonte,
+                'T',
+                'R',
+                0,
+                ''
+            );
             $x += $col['vlrTotal'];
             //BASES DE CÁLCULO, ALÍQUOTAS e VALOR DOS TRIBUTOS
             $tributos = $this->linhasTributosItem($thisItem);
