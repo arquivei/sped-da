@@ -651,18 +651,18 @@ class Danfe extends Common
         $hDispo2 = $this->hPrint - 10 - ($hcabecalho + $hfooter + $hCabecItens)-4;
         //Contagem da altura ocupada para impressão dos itens
         $hUsado = $hCabecItens;
-        $w2 = $this->larguraDescricao($w);
+        $wItens = $w;
         $hDispo = $hDispo1;
         $totPag = 1;
         $i = 0;
         while ($i < $this->det->length) {
-            $hUsado += $this->alturaItem($this->det->item($i), $w2);
+            $hUsado += $this->alturaItem($this->det->item($i), $wItens);
             if (!$this->itensCabemNaPagina($hUsado, $hDispo)) {
                 $totPag++;
                 $hDispo = $hDispo2;
                 $hUsado = $hCabecItens;
                 // Remove canhoto para páginas secundárias em modo paisagem ('L')
-                $w2 = $this->larguraDescricao($this->wPrint);
+                $wItens = $this->wPrint;
                 $i--; // decrementa para readicionar o item que não coube nessa pagina na outra.
             }
             $i++;
@@ -2986,6 +2986,30 @@ class Danfe extends Common
     }
 
     /**
+     * Desconto do item, exibido abaixo do VLR TOTAL: "[VLR DESC 0,00]". Sem vDesc, exibe 0,00.
+     *
+     * @return string
+     */
+    protected function descontoItem(\DOMElement $det)
+    {
+        $vDesc = $this->getTagValue($det->getElementsByTagName('prod')->item(0), 'vDesc');
+        return '[VLR DESC ' . number_format(is_numeric($vDesc) ? $vDesc : 0, 2, ',', '.') . ']';
+    }
+
+    /**
+     * Largura em que o desconto quebra a linha na coluna VLR TOTAL. Deixa 1 mm de folga à esquerda:
+     * o textBox alinha à direita com 0,5 mm de margem e uma linha com a largura cheia começaria
+     * antes da divisória da esquerda.
+     *
+     * @param  float $wVlrTotal Largura da coluna VLR TOTAL
+     * @return float
+     */
+    protected function larguraDesconto($wVlrTotal)
+    {
+        return $wVlrTotal - 1;
+    }
+
+    /**
      * Linhas da coluna CST / CFOP: situação do ICMS (CST ou CSOSN, com a origem) e CFOP.
      *
      * @return array
@@ -3019,20 +3043,23 @@ class Danfe extends Common
     /**
      * Altura do item no quadro de produtos. Usada tanto na contagem de páginas (monta) quanto no desenho (itens).
      * Quadro atual: descrição + veículo 0 km. Quadro da Reforma Tributária: o maior entre a coluna DESCRIÇÃO
-     * (descrição + identificação + veículo) e as colunas empilhadas e de tributos.
+     * (descrição + identificação + veículo), a coluna VLR TOTAL (valor + desconto) e as colunas empilhadas
+     * e de tributos.
      *
+     * @param  float $w Largura útil do quadro de itens
      * @return float
      */
-    protected function alturaItem(\DOMElement $det, $wDescricao)
+    protected function alturaItem(\DOMElement $det, $w)
     {
+        $wDescricao = $this->larguraDescricao($w);
         $fonte = ['font'=>$this->fontePadrao, 'size'=>7, 'style'=>''];
+        $fonteId = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
         $linhas = $this->pdf->getNumLines(trim($this->descricaoProduto($det)), $wDescricao, $fonte);
         $h = round(($linhas * $this->pdf->fontSize) + ($linhas * 0.5), 2);
         $rtc = $this->rtc->possuiGrupos();
         if ($rtc) {
             $identificacao = $this->identificacaoItem($det);
             if ($identificacao !== '') {
-                $fonteId = ['font'=>$this->fontePadrao, 'size'=>6, 'style'=>''];
                 $linhasId = $this->pdf->getNumLines($identificacao, $wDescricao, $fonteId);
                 $h += round(($linhasId * $this->pdf->fontSize) + ($linhasId * 0.5), 2);
             }
@@ -3045,6 +3072,12 @@ class Danfe extends Common
             $linhasColunas = max(2, count($tributos['bases']), count($tributos['aliquotas']));
             $this->pdf->setFont($this->fontePadrao, '', 6);
             $h = max($h, round(($linhasColunas * $this->pdf->fontSize) + ($linhasColunas * 0.5), 2));
+            //VLR TOTAL: valor na fonte 7 e, abaixo, o desconto na fonte 6 com quebra de linha
+            $wDesconto = $this->larguraDesconto($this->colunasItensReformaTributaria($w)['vlrTotal']);
+            $linhasDesconto = $this->pdf->getNumLines($this->descontoItem($det), $wDesconto, $fonteId);
+            $hDesconto = ($linhasDesconto * $this->pdf->fontSize) + ($linhasDesconto * 0.5);
+            $this->pdf->setFont($this->fontePadrao, '', 7);
+            $h = max($h, round($this->pdf->fontSize + 0.5 + $hDesconto, 2));
         }
         return $h;
     }
@@ -3199,7 +3232,7 @@ class Danfe extends Common
 
                 $textoProduto = trim($this->descricaoProduto($thisItem));
                 // altura inclui +32 do veículo 0 km
-                $h = $this->alturaItem($thisItem, $w2);
+                $h = $this->alturaItem($thisItem, $w);
                 $veicProd = $prod->getElementsByTagName("veicProd")->item(0);
 
                 $hUsado += $h;
@@ -3433,7 +3466,7 @@ class Danfe extends Common
             }
             $thisItem = $this->det->item($i);
             $prod = $thisItem->getElementsByTagName('prod')->item(0);
-            $h = $this->alturaItem($thisItem, $col['descricao']);
+            $h = $this->alturaItem($thisItem, $w);
             $hUsado += $h;
             if ($pag != $totpag && !$this->itensCabemNaPagina($hUsado, $hmax) && $i < $totItens) {
                 $nInicio = $i;
@@ -3488,21 +3521,20 @@ class Danfe extends Common
             $texto = is_numeric($vProd) ? number_format($vProd, 2, ',', '.') : '';
             $fonte = ['size' => $this->tamanhoFonteQueCabe($texto, $col['vlrTotal'])] + $fonte7;
             $sizeTotal = $this->pdf->textBox($x, $y, $col['vlrTotal'], $h, $texto, $fonte, 'T', 'R', 0, '');
-            //desconto do item abaixo do VLR TOTAL: "[VLR DESC 0,00]"; reduz a fonte até caber na coluna
-            $vDesc = $this->getTagValue($prod, 'vDesc');
-            $texto = '[VLR DESC ' . number_format(is_numeric($vDesc) ? $vDesc : 0, 2, ',', '.') . ']';
-            $fonte = ['size' => $this->tamanhoFonteQueCabe($texto, $col['vlrTotal'], 6, 3)] + $fonte6;
+            //desconto do item abaixo do VLR TOTAL, na fonte do [NCM ...], quebrando a linha se não couber
+            $wDesconto = $this->larguraDesconto($col['vlrTotal']);
             $this->pdf->textBox(
-                $x,
+                $x + $col['vlrTotal'] - $wDesconto,
                 $y + $sizeTotal,
-                $col['vlrTotal'],
+                $wDesconto,
                 $h - $sizeTotal,
-                $texto,
-                $fonte,
+                $this->descontoItem($thisItem),
+                $fonte6,
                 'T',
                 'R',
                 0,
-                ''
+                '',
+                false
             );
             $x += $col['vlrTotal'];
             //BASES DE CÁLCULO, ALÍQUOTAS e VALOR DOS TRIBUTOS
