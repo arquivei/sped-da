@@ -1391,9 +1391,13 @@ class Danfse extends DaCommon
         return isset($map[$value]) ? $map[$value] : $this->dash($value);
     }
 
+    /**
+     * O //IGNORE descarta o que não tem equivalente em ISO-8859-1 (ex.: zero-width space, CJK).
+     * Sem ele, o GNU libiconv da imagem Alpine devolve false e o texto inteiro some do PDF.
+     */
     private function toIso($text)
     {
-        return iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $text);
+        return iconv('UTF-8', 'ISO-8859-1//TRANSLIT//IGNORE', $text);
     }
 
     private function adjustImage($logo, $turn_bw = false)
